@@ -1,0 +1,19 @@
+# Ignore user-specific settings
+.vscode/settings.json
+
+# Include project-specific settings
+!.vscode/settings.json
+
+# Ignore other common files and directories
+*.log
+*.tmp
+*.swp
+*.bak
+*.old
+*.orig
+*.rej
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+.DS_Store
+Thumbs.db
