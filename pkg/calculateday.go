@@ -16,8 +16,7 @@ func getLastFriday(t time.Time) time.Time {
 	return getFriday(t.AddDate(0, 0, -7))
 }
 
-func calculateFridayNumber() int {
-	// TODO日付は引数で対応
+func NewNumber() int {
 	today := time.Now()
 
 	baseFriday := time.Date(2024, 9, 6, 0, 0, 0, 0, time.Local)

@@ -10,10 +10,12 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// TODO呼び出し引数
-func Parse() ([]string, error) {
+func GetResult(num int) ([]string, error) {
+	url := "https://www.mizuhobank.co.jp/retail/takarakuji/loto/loto7/csv/A1030" + strconv.Itoa(num) + ".CSV"
+	return Parse(url)
+}
 
-	url := "https://www.mizuhobank.co.jp/retail/takarakuji/loto/loto7/csv/A1030" + strconv.Itoa(calculateFridayNumber()) + ".CSV"
+func Parse(url string) ([]string, error) {
 	body, err := api.FetchCSV(url)
 	if err != nil {
 		return nil, err
@@ -28,5 +30,11 @@ func Parse() ([]string, error) {
 		return nil, err
 	}
 
-	return records[3], nil
+	return trimRecordKeys(records[3]), nil
+}
+
+func trimRecordKeys(records []string) []string {
+	filteredRecords := records[1:8]
+
+	return filteredRecords
 }
