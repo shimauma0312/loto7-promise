@@ -4,15 +4,18 @@ import (
 	"fmt"
 )
 
-func GetResult(repeatNum int) {
+func GetResult(repeatNum int) [][]string {
 	newNum := NewNumber()
+
+	records := make([][]string, 0)
 	for i := 0; i < repeatNum; i++ {
 		cnt := newNum - i
-		records, err := GetCsv(cnt)
+		record, err := GetCsv(cnt)
 		if err != nil {
 			fmt.Println(err)
-			return
+			return nil
 		}
-		fmt.Printf("第%d回：%s\n", cnt, records)
+		records = append(records, record)
 	}
+	return records
 }
