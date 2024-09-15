@@ -30,7 +30,7 @@ func main() {
 		fmt.Println("Error: 過去回数は数値で指定してください")
 		return
 	}
-	result.GetResult(num)
+	fmt.Println(result.GetResult(num))
 
 }
 
