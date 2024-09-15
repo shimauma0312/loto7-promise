@@ -48,5 +48,5 @@ func result(repeatNum int) {
 
 func printUsage() {
 	fmt.Println("Usage:")
-	fmt.Println("  -result <過去回数>  過去回数分の当選番号を出力します")
+	fmt.Println("  <過去回数> 過去回数分の当選番号を出力します")
 }
