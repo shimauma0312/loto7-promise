@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/shimauma0312/loto7-results/internal/result"
+	"github.com/shimauma0312/loto7-promise/internal/result"
 )
 
 func main() {

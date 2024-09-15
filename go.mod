@@ -1,4 +1,4 @@
-module github.com/shimauma0312/loto7-results
+module github.com/shimauma0312/loto7-promise
 
 go 1.23
 

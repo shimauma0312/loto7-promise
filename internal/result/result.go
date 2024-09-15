@@ -3,7 +3,7 @@ package result
 import (
 	"fmt"
 
-	"github.com/shimauma0312/loto7-results/internal"
+	"github.com/shimauma0312/loto7-promise/internal"
 )
 
 func GetResult(repeatNum int) {
