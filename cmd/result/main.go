@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/shimauma0312/loto7-results/internal/result"
 )
 
 func main() {
@@ -28,7 +30,7 @@ func main() {
 		fmt.Println("Error: 過去回数は数値で指定してください")
 		return
 	}
-	result(num)
+	result.GetResult(num)
 
 }
 

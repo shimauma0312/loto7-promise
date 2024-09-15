@@ -2,14 +2,15 @@ package result
 
 import (
 	"fmt"
-	"loto7-results/internal"
+
+	"github.com/shimauma0312/loto7-results/internal"
 )
 
-func Result(repeatNum int) {
+func GetResult(repeatNum int) {
 	newNum := internal.NewNumber()
 	for i := 0; i < repeatNum; i++ {
 		cnt := newNum - i
-		records, err := internal.GetResult(cnt)
+		records, err := internal.GetCsv(cnt)
 		if err != nil {
 			fmt.Println(err)
 			return

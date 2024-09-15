@@ -12,7 +12,7 @@ import (
 	"golang.org/x/text/transform"
 )
 
-func GetResult(num int) ([]string, error) {
+func GetCsv(num int) ([]string, error) {
 	url := "https://www.mizuhobank.co.jp/retail/takarakuji/loto/loto7/csv/A1030" + strconv.Itoa(num) + ".CSV"
 	return Parse(url)
 }
