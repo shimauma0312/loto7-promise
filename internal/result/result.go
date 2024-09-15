@@ -2,15 +2,13 @@ package result
 
 import (
 	"fmt"
-
-	"github.com/shimauma0312/loto7-promise/internal"
 )
 
 func GetResult(repeatNum int) {
-	newNum := internal.NewNumber()
+	newNum := NewNumber()
 	for i := 0; i < repeatNum; i++ {
 		cnt := newNum - i
-		records, err := internal.GetCsv(cnt)
+		records, err := GetCsv(cnt)
 		if err != nil {
 			fmt.Println(err)
 			return
