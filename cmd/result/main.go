@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"loto7-results/internal"
 	"os"
 	"strconv"
 )
@@ -38,10 +39,10 @@ func main() {
 }
 
 func result(repeatNum int) {
-	newNum := pkg.NewNumber()
+	newNum := internal.NewNumber()
 	for i := 0; i < repeatNum; i++ {
 		cnt := newNum - i
-		records, err := pkg.GetResult(cnt)
+		records, err := internal.GetResult(cnt)
 		if err != nil {
 			fmt.Println(err)
 			return
