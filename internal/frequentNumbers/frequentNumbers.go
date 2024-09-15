@@ -27,14 +27,14 @@ func GetFrequentNumbers() [][]int {
 
 	sorts := make([][]int, 0)
 	for i := 0; i < 7; i++ {
-		numbers := getNumbers(i)
+		numbers := getLine(i)
 		sorts = append(sorts, countTop10Numbers(convertToIntSlice(numbers)))
 	}
 
 	return sorts
 }
 
-func getNumbers(key int) []string {
+func getLine(key int) []string {
 	numbers := make([]string, 0)
 	for _, record := range results {
 		numbers = append(numbers, record[key])
