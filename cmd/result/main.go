@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-	resultFlag := flag.Bool("result", false, "repeat_numを指定してresultメソッドを実行")
 
 	flag.Parse()
 
@@ -18,24 +17,20 @@ func main() {
 		return
 	}
 
-	if *resultFlag {
-		if flag.NArg() < 1 {
-			fmt.Println("Error: resultには過去回数を指定してください")
-			printUsage()
-			return
-		}
-		repeatNum := flag.Arg(0)
-		num, err := strconv.Atoi(repeatNum)
-
-		if err != nil {
-			fmt.Println("Error: 過去回数は数値で指定してください")
-			return
-		}
-		result(num)
-	} else {
-		fmt.Println("Error: 不明な引数")
+	if flag.NArg() < 1 {
+		fmt.Println("Error: resultには過去回数を指定してください")
 		printUsage()
+		return
 	}
+	repeatNum := flag.Arg(0)
+	num, err := strconv.Atoi(repeatNum)
+
+	if err != nil {
+		fmt.Println("Error: 過去回数は数値で指定してください")
+		return
+	}
+	result(num)
+
 }
 
 func result(repeatNum int) {
