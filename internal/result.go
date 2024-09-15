@@ -2,7 +2,9 @@ package internal
 
 import (
 	"encoding/csv"
-	"loto7-results/api"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -16,7 +18,7 @@ func GetResult(num int) ([]string, error) {
 }
 
 func Parse(url string) ([]string, error) {
-	body, err := api.FetchCSV(url)
+	body, err := fetchCSV(url)
 	if err != nil {
 		return nil, err
 	}
@@ -31,6 +33,21 @@ func Parse(url string) ([]string, error) {
 	}
 
 	return trimRecordKeys(records[3]), nil
+}
+
+func fetchCSV(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("Error downloading the CSV: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading the response body: %v", err)
+	}
+
+	return body, nil
 }
 
 func trimRecordKeys(records []string) []string {
