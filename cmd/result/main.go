@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"loto7-results/pkg"
 	"os"
 	"strconv"
 )
