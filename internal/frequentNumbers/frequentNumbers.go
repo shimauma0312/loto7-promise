@@ -1,7 +1,6 @@
 package frequentNumbers
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 
@@ -17,7 +16,6 @@ func GetFrequentNumbers() [][]int {
 		for i, num := range numbers {
 			intNum, err := strconv.Atoi(num)
 			if err != nil {
-				fmt.Println("error converting string to int:", err)
 				return nil
 			}
 			intNumbers[i] = intNum
