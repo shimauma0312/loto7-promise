@@ -7,12 +7,19 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/transform"
 )
 
 func GetCsv(num int) ([]string, error) {
+	// Check if today is Friday
+	today := time.Now()
+	if today.Weekday() == time.Friday {
+		num -= 1
+	}
+
 	url := "https://www.mizuhobank.co.jp/retail/takarakuji/loto/loto7/csv/A1030" + strconv.Itoa(num) + ".CSV"
 	return Parse(url)
 }
