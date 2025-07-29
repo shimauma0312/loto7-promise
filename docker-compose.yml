@@ -1,0 +1,25 @@
+services:
+  # Result service - shows past lottery results
+  result:
+    build: .
+    command: ["./result"]
+    container_name: loto7-result
+    restart: unless-stopped
+    # Optional: uncomment to pass arguments
+    # command: ["./result", "10"]
+    
+  # Frequent numbers service - shows most frequent numbers
+  frequent:
+    build: .
+    command: ["./frequentNumbers"]
+    container_name: loto7-frequent
+    restart: unless-stopped
+
+  # Interactive service for manual commands
+  interactive:
+    build: .
+    command: ["sh"]
+    container_name: loto7-interactive
+    restart: "no"
+    stdin_open: true
+    tty: true
