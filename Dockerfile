@@ -4,12 +4,12 @@ FROM golang:1.23-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Copy all source code including vendor directory
+# Copy source code
 COPY . .
 
-# Build applications using vendor directory (no external downloads needed)
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags '-extldflags "-static"' -o /result ./cmd/result && \
-    CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -ldflags '-extldflags "-static"' -o /frequentNumbers ./cmd/frequentNumbers
+# Build applications 
+RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /result ./cmd/result && \
+    CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /frequentNumbers ./cmd/frequentNumbers
 
 # Runtime stage - using alpine for better compatibility
 FROM alpine:latest
