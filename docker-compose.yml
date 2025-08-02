@@ -1,25 +1,22 @@
 services:
-  # Result service - shows past lottery results
-  result:
-    build: .
-    command: ["./result"]
-    container_name: loto7-result
-    restart: unless-stopped
-    # Optional: uncomment to pass arguments
-    # command: ["./result", "10"]
-    
-  # Frequent numbers service - shows most frequent numbers
-  frequent:
-    build: .
-    command: ["./frequentNumbers"]
-    container_name: loto7-frequent
-    restart: unless-stopped
-
-  # Interactive service for manual commands
-  interactive:
-    build: .
-    command: ["sh"]
-    container_name: loto7-interactive
-    restart: "no"
+  # 開発用Go環境 - 1個だけあればOK
+  # 使い方：
+  #   docker-compose up -d --build
+  #   docker-compose exec dev sh
+  #   その後コンテナ内で: go run ./cmd/result など
+  dev:
+    image: golang:1.23-alpine
+    working_dir: /app
+    volumes:
+      - .:/app                    # ソースコードをマウント
+      - go-cache:/go/pkg/mod      # Goモジュールキャッシュで高速化
+    environment:
+      - CGO_ENABLED=0
+    container_name: loto7-dev
+    # コンテナを起動し続ける（execで入るため）
+    command: ["tail", "-f", "/dev/null"]
     stdin_open: true
     tty: true
+
+volumes:
+  go-cache:  # Goモジュールキャッシュ用
