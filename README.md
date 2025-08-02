@@ -12,6 +12,14 @@ go build -o <app name> ./cmd/result
 go build -o <app name> ./cmd/numberCount
 ```
 
+```
+go build -o <app name> ./cmd/consecutivePattern
+```
+
+```
+go build -o <app name> ./cmd/heatmap
+```
+
 ## Docker
 
 This project includes Docker support for easy deployment and execution.
@@ -45,6 +53,33 @@ docker run --rm loto7-promise ./numberCount -number=7 -range=100
 
 # Count multiple numbers
 docker run --rm loto7-promise ./numberCount -number=1,7,23 -range=50
+```
+
+Run the consecutive pattern analysis application:
+```bash
+# Analyze consecutive and same-digit patterns (default: 100 draws)
+docker run --rm loto7-promise ./consecutivePattern
+
+# Analyze patterns for specific range
+docker run --rm loto7-promise ./consecutivePattern -range=200
+```
+
+Run the heatmap analysis application:
+```bash
+# Generate position-based heatmap (default: 50 draws)
+docker run --rm loto7-promise ./heatmap
+
+# Generate heatmap for specific range
+docker run --rm loto7-promise ./heatmap -range=100
+
+# Show specific number's position details
+docker run --rm loto7-promise ./heatmap -number=7 -range=100
+
+# Show specific position's number details
+docker run --rm loto7-promise ./heatmap -position=1
+
+# Output in JSON format
+docker run --rm loto7-promise ./heatmap -json -range=30
 ```
 
 ### Using Docker Compose
