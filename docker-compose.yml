@@ -8,15 +8,54 @@ services:
     image: golang:1.23-alpine
     working_dir: /app
     volumes:
-      - .:/app                    # ソースコードをマウント
-      - go-cache:/go/pkg/mod      # Goモジュールキャッシュで高速化
+      - .:/app # ソースコードをマウント
+      - go-cache:/go/pkg/mod # Goモジュールキャッシュで高速化
     environment:
       - CGO_ENABLED=0
     container_name: loto7-dev
     # コンテナを起動し続ける（execで入るため）
-    command: ["tail", "-f", "/dev/null"]
+    command: [ "tail", "-f", "/dev/null" ]
     stdin_open: true
     tty: true
 
+  # APIサーバー
+  api:
+    build:
+      context: .
+      target: production
+    container_name: loto7-api
+    environment:
+      - GIN_MODE=release
+      - PORT=8080
+    ports:
+      - "8080:8080" # 直接アクセス用ポート
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx リバースプロキシ
+  nginx:
+    image: nginx:alpine
+    container_name: loto7-nginx
+    ports:
+      - "80:80" # HTTP用ポート
+      - "443:443" # HTTPS用ポート（証明書設定時）
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
-  go-cache:  # Goモジュールキャッシュ用
+  go-cache: # Goモジュールキャッシュ用
+  nginx-logs: # nginxログ永続化用

@@ -16,7 +16,7 @@ RUN go mod download
 COPY . .
 
 # デフォルトコマンド（開発時は通常オーバーライドされる）
-CMD ["go", "run", "./cmd/result"]
+CMD ["go", "run", "./cmd/api"]
 
 # ===== ビルド用ステージ =====
 FROM development AS builder
@@ -25,7 +25,8 @@ FROM development AS builder
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /result ./cmd/result && \
     CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /frequentNumbers ./cmd/frequentNumbers && \
     CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /numberCount ./cmd/numberCount && \
-    CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /consecutivePattern ./cmd/consecutivePattern
+    CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /consecutivePattern ./cmd/consecutivePattern && \
+    CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /api ./cmd/api
 
 # ===== 本番用ステージ =====
 FROM alpine:latest AS production
@@ -42,11 +43,15 @@ COPY --from=builder /result .
 COPY --from=builder /frequentNumbers .
 COPY --from=builder /numberCount .
 COPY --from=builder /consecutivePattern .
+COPY --from=builder /api .
 
 # セキュリティ：非rootユーザーを作成して使用
 RUN adduser -D -s /bin/sh appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# デフォルトコマンド
-CMD ["./result"]
+# デフォルトコマンド（本番環境ではAPIサーバーを起動）
+CMD ["./api"]
+
+# ポート8080を公開
+EXPOSE 8080
