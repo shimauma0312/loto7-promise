@@ -30,6 +30,7 @@ shell:
 	@echo "💡 コンテナ内でのコマンド例:"
 	@echo "   go run ./cmd/result"
 	@echo "   go run ./cmd/frequentNumbers"
+	@echo "   go run ./cmd/numberCount -number=7 -range=100"
 	@echo "   go build ./cmd/result"
 	@echo "   go test ./..."
 	@echo ""

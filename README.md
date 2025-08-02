@@ -8,6 +8,10 @@ go build -o <app name> ./cmd/frequentNumbers
 go build -o <app name> ./cmd/result
 ```
 
+```
+go build -o <app name> ./cmd/numberCount
+```
+
 ## Docker
 
 This project includes Docker support for easy deployment and execution.
@@ -32,6 +36,15 @@ docker run --rm loto7-promise ./result 10
 Run the frequent numbers application:
 ```bash
 docker run --rm loto7-promise ./frequentNumbers
+```
+
+Run the number count application:
+```bash
+# Count specific number appearances
+docker run --rm loto7-promise ./numberCount -number=7 -range=100
+
+# Count multiple numbers
+docker run --rm loto7-promise ./numberCount -number=1,7,23 -range=50
 ```
 
 ### Using Docker Compose
