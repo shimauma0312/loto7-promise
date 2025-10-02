@@ -2,6 +2,7 @@ package result
 
 import (
 	"fmt"
+	"time"
 )
 
 func GetResult(repeatNum int) [][]string {
@@ -16,6 +17,10 @@ func GetResult(repeatNum int) [][]string {
 			return nil
 		}
 		records = append(records, record)
+
+		if i < repeatNum-1 {
+			time.Sleep(1 * time.Second)
+		}
 	}
 	return records
 }
