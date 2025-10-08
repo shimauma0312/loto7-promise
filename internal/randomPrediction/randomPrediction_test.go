@@ -5,16 +5,23 @@ import (
 	"time"
 )
 
-// TestGenerateRandomPrediction_ValidInput 正常な入力値での予想番号生成テスト
+package randomPrediction
+
+import (
+	"testing"
+	"time"
+)
+
+// TestGenerateRandomPrediction_ValidInput 正常な入力値での予想番号生成テスト（改良版）
 func TestGenerateRandomPrediction_ValidInput(t *testing.T) {
 	testCases := []struct {
 		analysisRange int
 		useTrend      bool
 		description   string
 	}{
-		{50, true, "傾向ベース予想"},
+		{50, true, "統計分析予想"},
 		{100, false, "ランダム予想"},
-		{30, true, "短期傾向ベース予想"},
+		{30, true, "短期分析予想"},
 	}
 	
 	for _, tc := range testCases {
@@ -77,6 +84,22 @@ func TestGenerateRandomPrediction_ValidInput(t *testing.T) {
 				}
 				bonusNumSet[num] = true
 			}
+			
+			// 本数字とボーナス数字の重複チェック
+			for _, mainNum := range result.MainNumbers {
+				for _, bonusNum := range result.BonusNumbers {
+					if mainNum == bonusNum {
+						t.Errorf("期待: 本数字とボーナス数字に重複なし, 実際: %dが重複", mainNum)
+					}
+				}
+			}
+			
+			// 統計分析情報の検証（傾向ベースの場合）
+			if tc.useTrend && result.AnalysisInfo != nil {
+				if result.AnalysisInfo.TotalAnalysisTime <= 0 {
+					t.Errorf("期待: 分析時間が正の値, 実際: %v", result.AnalysisInfo.TotalAnalysisTime)
+				}
+			}
 		})
 	}
 }
@@ -98,6 +121,119 @@ func TestGenerateRandomPrediction_InvalidInput(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGenerateMultiplePredictions_Diversity 複数予想の多様性テスト
+func TestGenerateMultiplePredictions_Diversity(t *testing.T) {
+	count := 5
+	results, err := GenerateMultiplePredictions(count, 100, true)
+	
+	if err != nil {
+		t.Fatalf("期待: エラーなし, 実際: %v", err)
+	}
+	
+	if len(results) != count {
+		t.Errorf("期待: %d個の予想, 実際: %d個", count, len(results))
+	}
+	
+	// 多様性チェック: すべて同じ予想ではないことを確認
+	allSame := true
+	if len(results) > 1 {
+		first := results[0]
+		for i := 1; i < len(results); i++ {
+			if !equalSlices(first.MainNumbers, results[i].MainNumbers) {
+				allSame = false
+				break
+			}
+		}
+	}
+	
+	if allSame && len(results) > 1 {
+		t.Error("期待: 多様な予想, 実際: すべて同じ予想")
+	}
+	
+	// 各予想の妥当性チェック
+	for i, result := range results {
+		if len(result.MainNumbers) != 7 {
+			t.Errorf("予想%d: 期待: 本数字7個, 実際: %d個", i+1, len(result.MainNumbers))
+		}
+		if len(result.BonusNumbers) != 2 {
+			t.Errorf("予想%d: 期待: ボーナス数字2個, 実際: %d個", i+1, len(result.BonusNumbers))
+		}
+	}
+}
+
+// TestStatisticalPattern_Default デフォルト統計パターンのテスト
+func TestStatisticalPattern_Default(t *testing.T) {
+	pattern := GetDefaultStatisticalPattern()
+	
+	if pattern == nil {
+		t.Fatal("期待: デフォルトパターンが返される, 実際: nil")
+	}
+	
+	// 重みの合計が1.0に近いことを確認（誤差許容）
+	totalWeight := pattern.FrequencyWeight + pattern.ConsecutiveWeight + 
+					pattern.IntervalWeight + pattern.OddEvenWeight + 
+					pattern.RangeWeight + pattern.PeriodicityWeight + 
+					pattern.CorrelationWeight
+	
+	if totalWeight < 0.99 || totalWeight > 1.01 {
+		t.Errorf("期待: 重みの合計が1.0付近, 実際: %.3f", totalWeight)
+	}
+	
+	// すべての重みが正であることを確認
+	weights := []float64{
+		pattern.FrequencyWeight, pattern.ConsecutiveWeight, pattern.IntervalWeight,
+		pattern.OddEvenWeight, pattern.RangeWeight, pattern.PeriodicityWeight, pattern.CorrelationWeight,
+	}
+	
+	for i, weight := range weights {
+		if weight <= 0 {
+			t.Errorf("期待: 重み[%d]が正の値, 実際: %.3f", i, weight)
+		}
+	}
+}
+
+// TestPredictionSimilarity 予想類似度計算のテスト
+func TestPredictionSimilarity(t *testing.T) {
+	// 同じ予想の類似度は1.0
+	result1 := &PredictionResult{
+		MainNumbers:  []int{1, 2, 3, 4, 5, 6, 7},
+		BonusNumbers: []int{8, 9},
+	}
+	result2 := &PredictionResult{
+		MainNumbers:  []int{1, 2, 3, 4, 5, 6, 7},
+		BonusNumbers: []int{8, 9},
+	}
+	
+	similarity := calculatePredictionSimilarity(result1, result2)
+	if similarity != 1.0 {
+		t.Errorf("期待: 類似度1.0, 実際: %.3f", similarity)
+	}
+	
+	// 完全に異なる予想の類似度は0.0
+	result3 := &PredictionResult{
+		MainNumbers:  []int{10, 11, 12, 13, 14, 15, 16},
+		BonusNumbers: []int{17, 18},
+	}
+	
+	similarity = calculatePredictionSimilarity(result1, result3)
+	if similarity != 0.0 {
+		t.Errorf("期待: 類似度0.0, 実際: %.3f", similarity)
+	}
+}
+
+// equalSlices スライスが等しいかどうかを判定するヘルパー関数
+func equalSlices(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // TestGenerateMultiplePredictions_ValidInput 複数予想番号生成の正常テスト
