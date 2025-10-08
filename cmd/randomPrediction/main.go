@@ -15,6 +15,8 @@ func main() {
 		useTrend  = flag.Bool("trend", true, "過去データの傾向を考慮するかどうか")
 		range_    = flag.Int("range", 100, "傾向分析に使用する過去回数")
 		random    = flag.Bool("random", false, "完全ランダム生成（傾向を無視）")
+		details   = flag.Bool("details", false, "分析情報表示")
+		verbose   = flag.Bool("verbose", false, "詳細ログ表示")
 	)
 
 	flag.Usage = func() {
@@ -24,9 +26,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "オプション:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n例:\n")
-		fmt.Fprintf(os.Stderr, "  %s                                   # 傾向ベースで1組生成\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s                                   # 統計分析で1組生成\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -count 5 -range 200              # 過去200回の傾向で5組生成\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -random -count 3                 # 完全ランダムで3組生成\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -details -verbose                # 分析情報付きで生成\n", os.Args[0])
 	}
 
 	flag.Parse()
@@ -47,6 +50,18 @@ func main() {
 		*useTrend = false
 	}
 
+	// 詳細ログ表示
+	if *verbose {
+		fmt.Printf("🔧 設定: 生成数=%d, 分析範囲=%d, 傾向分析=%t, 詳細表示=%t\n", 
+			*count, *range_, *useTrend, *details)
+		if *useTrend {
+			fmt.Println("統計分析モードで実行します...")
+		} else {
+			fmt.Println("ランダムモードで実行します...")
+		}
+		fmt.Println()
+	}
+
 	// 単一の予想番号生成
 	if *count == 1 {
 		result, err := randomPrediction.GenerateRandomPrediction(*range_, *useTrend)
@@ -55,7 +70,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		randomPrediction.PrintPredictionResult(result)
+		randomPrediction.PrintPredictionResultWithDetails(result, *details)
 		return
 	}
 
@@ -66,5 +81,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	randomPrediction.PrintMultiplePredictions(results)
+	randomPrediction.PrintMultiplePredictionsWithDetails(results, *details)
 }
