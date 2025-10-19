@@ -2,7 +2,7 @@
 # Loto7 Promise - 超シンプル版
 # ================================
 
-.PHONY: help up down shell clean
+.PHONY: help up down shell clean build test recommend
 
 # デフォルトのヘルプ表示
 help:
@@ -14,7 +14,11 @@ help:
 	@echo "  3. コンテナ内で: go run ./cmd/result"
 	@echo "  4. make down  - コンテナ停止"
 	@echo ""
+	@echo "  make recommend - ロト7推薦番号を生成"
+	@echo ""
 	@echo "その他:"
+	@echo "  make build    - 全実行ファイルをビルド"
+	@echo "  make test     - 全テストを実行"
 	@echo "  make clean    - 全部お掃除"
 	@echo ""
 
@@ -32,6 +36,8 @@ shell:
 	@echo "   go run ./cmd/heatmap -range=50          - 過去50回分のヒートマップ分析"
 	@echo "   go run ./cmd/heatmap -number=7 -range=100 - 数字7の詳細分析"
 	@echo "   go run ./cmd/heatmap -position=1 -json  - 1番目位置をJSON出力"
+	@echo "   go run ./cmd/recommendation             - ロト7推薦番号生成"
+	@echo "   go run ./cmd/recommendation -help       - 推薦機能のヘルプ"
 	@echo "   go build ./cmd/result                   - 実行ファイル生成"
 	@echo "   go test ./...                          - テスト実行"
 	@echo ""
@@ -49,3 +55,23 @@ clean:
 	docker-compose down --volumes --remove-orphans
 	docker system prune -f
 	@echo "きれいになりました！"
+
+# 実行ファイルをビルド
+build:
+	@echo "📦 全実行ファイルをビルド中..."
+	go build -o ./bin/result ./cmd/result
+	go build -o ./bin/heatmap ./cmd/heatmap
+	go build -o ./bin/recommendation ./cmd/recommendation
+	@echo "✅ ビルド完了！ ./bin/ に実行ファイルが作成されました"
+
+# 全テストを実行
+test:
+	@echo "🧪 テスト実行中..."
+	go test ./...
+	@echo "✅ テスト完了"
+
+# ロト7推薦番号を生成
+recommend:
+	@echo "🎲 ロト7推薦番号を生成中..."
+	go run ./cmd/recommendation
+	@echo "✅ 推薦完了"
