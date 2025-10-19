@@ -3,8 +3,8 @@ package result
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -39,7 +39,9 @@ func GetResult(repeatNum int) [][]string {
 	}
 
 	return results
-} // GetResultDirect 従来の直接ダウンロード方式（フォールバック用）
+}
+
+// GetResultDirect 従来の直接ダウンロード方式（フォールバック用）
 func GetResultDirect(repeatNum int) [][]string {
 	newNum := NewNumber()
 
@@ -71,7 +73,7 @@ func loadMetadata() (*CacheMetadata, error) {
 		return &CacheMetadata{}, nil
 	}
 
-	data, err := ioutil.ReadFile(MetadataFile)
+	data, err := os.ReadFile(MetadataFile)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +89,7 @@ func saveMetadata(metadata *CacheMetadata) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(MetadataFile, data, 0644)
+	return os.WriteFile(MetadataFile, data, 0644)
 }
 
 // loadCachedData キャッシュされたデータを読み込み
@@ -96,7 +98,7 @@ func loadCachedData() ([]DrawResult, error) {
 		return []DrawResult{}, nil
 	}
 
-	data, err := ioutil.ReadFile(DataFile)
+	data, err := os.ReadFile(DataFile)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +114,7 @@ func saveCachedData(results []DrawResult) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(DataFile, data, 0644)
+	return os.WriteFile(DataFile, data, 0644)
 }
 
 // needUpdate 更新が必要かチェック
@@ -183,6 +185,10 @@ func updateCache() error {
 		}
 	}
 
+	// latestDataを降順にソート（新しい→古い）
+	sort.Slice(latestData, func(i, j int) bool {
+		return latestData[i].DrawNumber > latestData[j].DrawNumber
+	})
 	updatedData := append(latestData, cachedData...)
 
 	if err := saveCachedData(updatedData); err != nil {
@@ -233,7 +239,7 @@ func getCachedResults(repeatNum int) ([][]string, error) {
 		}
 
 		var additionalData []DrawResult
-		for drawNum := startDrawNum; drawNum < oldestCachedDrawNum; drawNum++ {
+		for drawNum := oldestCachedDrawNum - 1; drawNum >= startDrawNum; drawNum-- {
 			record, err := GetCsv(drawNum)
 			if err != nil {
 				fmt.Printf("第%d回の取得に失敗: %v\n", drawNum, err)
