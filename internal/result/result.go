@@ -34,14 +34,14 @@ func GetResult(repeatNum int) [][]string {
 	// キャッシュから結果を取得
 	results, err := getCachedResults(repeatNum)
 	if err != nil {
-		fmt.Printf("キャッシュからの取得に失敗しました。従来の方法で取得します: %v\n", err)
+		// キャッシュからの取得に失敗した場合は従来の方法で取得
 		return GetResultDirect(repeatNum)
 	}
 
 	return results
 }
 
-// GetResultDirect 従来の直接ダウンロード方式（フォールバック用）
+// GetResultDirect 従来の直接ダウンロード
 func GetResultDirect(repeatNum int) [][]string {
 	newNum := NewNumber()
 
@@ -50,7 +50,7 @@ func GetResultDirect(repeatNum int) [][]string {
 		cnt := newNum - i
 		record, err := GetCsv(cnt)
 		if err != nil {
-			fmt.Println(err)
+			// エラーが発生した場合は処理を中断
 			return nil
 		}
 		records = append(records, record)
@@ -144,7 +144,7 @@ func updateCache() error {
 	}
 
 	if !needUpd {
-		fmt.Println("キャッシュは最新です。")
+		// キャッシュは最新
 		return nil
 	}
 
@@ -159,17 +159,15 @@ func updateCache() error {
 
 	if len(cachedData) == 0 {
 		startDrawNum = currentDrawNum - 9 // 初回は10回分（段階的に増やす）
-		fmt.Printf("初回実行: 第%d回～第%d回を取得中...\n", startDrawNum, currentDrawNum)
 	} else {
 		lastCachedDrawNum := cachedData[0].DrawNumber
 		startDrawNum = lastCachedDrawNum + 1
-		fmt.Printf("更新: 第%d回～第%d回を取得中...\n", startDrawNum, currentDrawNum)
 	}
 
 	for drawNum := startDrawNum; drawNum <= currentDrawNum; drawNum++ {
 		record, err := GetCsv(drawNum)
 		if err != nil {
-			fmt.Printf("第%d回の取得に失敗: %v\n", drawNum, err)
+			// 取得に失敗した場合はスキップして次へ
 			continue
 		}
 
@@ -206,7 +204,7 @@ func updateCache() error {
 	}
 
 	if len(latestData) > 0 {
-		fmt.Printf("キャッシュを更新しました。(新規%d件、全%d件)\n", len(latestData), len(updatedData))
+		// キャッシュ更新完了
 	}
 	return nil
 }
@@ -228,7 +226,7 @@ func getCachedResults(repeatNum int) ([][]string, error) {
 
 	// 要求された回数分のデータが不足している場合、追加取得
 	if len(cachedData) < repeatNum {
-		fmt.Printf("キャッシュ不足: %d回分必要、%d回分のみ存在。追加取得中...\n", repeatNum, len(cachedData))
+		// キャッシュ不足のため追加取得を実行
 
 		currentDrawNum := NewNumber()
 		oldestCachedDrawNum := cachedData[len(cachedData)-1].DrawNumber
@@ -242,7 +240,7 @@ func getCachedResults(repeatNum int) ([][]string, error) {
 		for drawNum := oldestCachedDrawNum - 1; drawNum >= startDrawNum; drawNum-- {
 			record, err := GetCsv(drawNum)
 			if err != nil {
-				fmt.Printf("第%d回の取得に失敗: %v\n", drawNum, err)
+				// 取得に失敗した場合はスキップして次へ
 				continue
 			}
 
@@ -275,7 +273,7 @@ func getCachedResults(repeatNum int) ([][]string, error) {
 		}
 
 		cachedData = updatedData
-		fmt.Printf("追加取得完了: 全%d件\n", len(cachedData))
+		// 追加取得完了
 	}
 
 	var results [][]string
