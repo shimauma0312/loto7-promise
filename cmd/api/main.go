@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -51,7 +52,9 @@ func main() {
 
 		// ヒートマップ
 		v1.GET("/heatmap", getHeatmap)
+		v1.GET("/heatmap/table", getHeatmapTableDefault)
 		v1.GET("/heatmap/:range", getHeatmapWithRange)
+		v1.GET("/heatmap/:range/table", getHeatmapTable)
 		v1.GET("/heatmap/:range/number/:number", getHeatmapByNumber)
 		v1.GET("/heatmap/:range/position/:position", getHeatmapByPosition)
 
@@ -71,6 +74,7 @@ func main() {
 					"health":          "/health",
 					"results":         "/api/v1/results",
 					"heatmap":         "/api/v1/heatmap",
+					"heatmap_table":   "/api/v1/heatmap/table",
 					"recommendations": "/api/v1/recommendations",
 				},
 				"documentation": "https://github.com/shimauma0312/loto7-promise",
@@ -722,4 +726,139 @@ func generateRecommendations(c *gin.Context, config recommendation.Recommendatio
 
 	response := api.SuccessResponse("推薦を正常に生成しました", data)
 	c.JSON(http.StatusOK, response)
+}
+
+// 指定範囲の抽選結果からヒートマップテーブルをマークダウン形式で取得する
+//
+// 機能:
+//   - 指定された範囲の過去の抽選結果から位置別出現ヒートマップテーブルを生成
+//   - マークダウン形式のテーブルとして出力
+//   - 統計情報も含めて表形式で視覚的に分かりやすく表示
+//
+// リクエスト:
+//   - HTTP Method: GET
+//   - Path: /api/v1/heatmap/{range}/table
+//   - Parameters:
+//   - range (path): 分析対象とする抽選回数 (1-1000の範囲、省略時は50)
+//
+// レスポンス:
+//   - Status: 200 OK
+//   - Content-Type: text/plain
+//   - Body: マークダウン形式のヒートマップテーブル
+//   - ヘッダー情報（検索範囲、実際の抽選回数）
+//   - 位置別出現回数テーブル（数字1-37 × 位置1-7 + 合計）
+//   - 統計情報（最頻出数字、最低出現数字、最も偏りが大きい数字）
+//
+// エラーレスポンス:
+//   - 400 Bad Request: rangeが範囲外の値 (1-1000以外)
+//   - 500 Internal Server Error: ヒートマップ生成に失敗
+//
+// 注意:
+//   - レスポンスはJSONではなくプレーンテキスト形式
+//   - マークダウンビューアで表として表示可能
+//   - コピー&ペーストでそのまま使用可能
+func getHeatmapTable(c *gin.Context) {
+	// パスパラメータから範囲を取得
+	rangeStr := c.Param("range")
+	searchRange := 50 // デフォルト値
+
+	if rangeStr != "" {
+		if parsedRange, err := strconv.Atoi(rangeStr); err == nil && parsedRange > 0 && parsedRange <= 1000 {
+			searchRange = parsedRange
+		} else {
+			c.Header("Content-Type", "text/plain")
+			c.String(http.StatusBadRequest, "エラー: 範囲は1-1000の値で指定してください")
+			return
+		}
+	}
+
+	// ヒートマップを生成
+	summary, err := heatmap.GenerateHeatmap(searchRange)
+	if err != nil {
+		c.Header("Content-Type", "text/plain")
+		c.String(http.StatusInternalServerError, "エラー: ヒートマップの生成に失敗しました - %s", err.Error())
+		return
+	}
+
+	// マークダウン形式のテーブルを生成
+	tableText := generateMarkdownHeatmapTable(summary)
+
+	// プレーンテキストとして返却
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.String(http.StatusOK, tableText)
+}
+
+// ヒートマップテーブルをデフォルト設定（50回分）でマークダウン形式で取得する
+//
+// 機能:
+//   - 過去50回分の抽選結果からヒートマップテーブルを生成（デフォルト値）
+//   - getHeatmapTableの内部呼び出しでrange=50固定
+//
+// リクエスト:
+//   - HTTP Method: GET
+//   - Path: /api/v1/heatmap/table
+//   - Parameters: なし
+//
+// レスポンス:
+//   - getHeatmapTableと同じ形式
+//
+// 注意:
+//   - この関数は内部でgetHeatmapTableを呼び出すラッパー関数
+func getHeatmapTableDefault(c *gin.Context) {
+	// 50回分を固定で設定
+	c.Params = append(c.Params, gin.Param{Key: "range", Value: "50"})
+	getHeatmapTable(c)
+}
+
+// ヒートマップサマリーからマークダウン形式のテーブルを生成
+func generateMarkdownHeatmapTable(summary *heatmap.HeatmapSummary) string {
+	var result strings.Builder
+
+	// ヘッダー情報
+	result.WriteString(fmt.Sprintf("# ロト7位置別出現ヒートマップ（過去%d回分）\n\n", summary.SearchRange))
+	result.WriteString(fmt.Sprintf("**実際の抽選回数**: %d回\n\n", summary.ActualDraws))
+
+	// テーブルヘッダー
+	result.WriteString("| 数字 | 位置1 | 位置2 | 位置3 | 位置4 | 位置5 | 位置6 | 位置7 | 合計 |\n")
+	result.WriteString("|------|-------|-------|-------|-------|-------|-------|-------|------|\n")
+
+	// データ行
+	for number := 1; number <= 37; number++ {
+		result.WriteString(fmt.Sprintf("| %2d", number))
+		total := 0
+		for position := 1; position <= 7; position++ {
+			count := summary.PositionData[number][position].Count
+			result.WriteString(fmt.Sprintf(" | %3d", count))
+			total += count
+		}
+		result.WriteString(fmt.Sprintf(" | %3d |\n", total))
+	}
+
+	// 統計情報
+	result.WriteString("\n## 統計情報\n\n")
+
+	// 最頻出数字
+	result.WriteString(fmt.Sprintf("**最頻出数字**: %v\n", formatNumberList(summary.HottestNumbers)))
+
+	// 最低出現数字
+	result.WriteString(fmt.Sprintf("**最低出現数字**: %v\n", formatNumberList(summary.ColdestNumbers)))
+
+	// 最も偏りが大きい数字
+	result.WriteString(fmt.Sprintf("**最も位置偏りが大きい数字**: %d\n", summary.MostBiasedNumber))
+
+	return result.String()
+}
+
+// 数字リストをフォーマット
+func formatNumberList(numbers []int) string {
+	if len(numbers) == 0 {
+		return "なし"
+	}
+
+	var strNumbers []string
+	for _, num := range numbers {
+		strNumbers = append(strNumbers, strconv.Itoa(num))
+	}
+
+	return "[" + strings.Join(strNumbers, ", ") + "]"
 }
