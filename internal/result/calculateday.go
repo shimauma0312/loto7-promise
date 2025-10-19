@@ -29,3 +29,18 @@ func NewNumber() int {
 
 	return baseNumber + weeksDiff
 }
+
+// GetDrawDate 抽選回数から実際の抽選日を計算
+func GetDrawDate(drawNumber int) string {
+	// 2025年10月18日を第648回の基準日
+	baseFriday := time.Date(2025, 10, 18, 0, 0, 0, 0, time.Local)
+	baseNumber := 648
+
+	// 基準日からの差分を計算
+	weeksDiff := drawNumber - baseNumber
+
+	// 抽選日を計算（毎週金曜日）
+	drawDate := baseFriday.AddDate(0, 0, weeksDiff*7)
+
+	return drawDate.Format("2006-01-02")
+}

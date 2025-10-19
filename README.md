@@ -1,109 +1,206 @@
-## build
+# Loto7 Promise
+
+ロト7あてる
+
+## Docker環境構築
+```bash
+
+// Docker環境の起動
+docker compose up -d --build
+
+// コンテナアクセス
+docker compose exec dev sh
+
+// 環境の停止
+docker compose down
 
 ```
-go build -o <app name> ./cmd/frequentNumbers
+
+## APIサーバー構築呼び出し
+
+### 1. APIサーバー起動
+```bash
+go run cmd/api/main.go
 ```
 
-```
-go build -o <app name> ./cmd/result
+### 2. APIエンドポイント
+
+ベースURL: `http://localhost:8080`
+
+#### ヘルスチェック
+```bash
+curl http://localhost:8080/health
 ```
 
-```
-go build -o <app name> ./cmd/numberCount
+#### 抽選結果取得
+```bash
+# 過去10回分の結果取得
+curl http://localhost:8080/api/results?count=10
+
+# 過去100回分の結果取得
+curl http://localhost:8080/api/results?count=100
 ```
 
-```
-go build -o <app name> ./cmd/consecutivePattern
+#### ヒートマップ分析
+```bash
+# 基本ヒートマップ（過去50回）
+curl http://localhost:8080/api/heatmap
+
+# 詳細ヒートマップ（過去100回）
+curl http://localhost:8080/api/heatmap?range=100
 ```
 
+#### 推薦番号生成
+```bash
+# 推薦番号の生成
+curl http://localhost:8080/api/recommendation
 ```
-go build -o <app name> ./cmd/heatmap
+
+## APIデプロイ
+
+### 前提条件
+- Go 1.23 以上がインストールされてること
+- 
+
+### 1. ビルド
+```bash
+# APIサーバーをビルド
+go build -o loto7-api ./cmd/api
+
+# Linux
+GOOS=linux GOARCH=amd64 go build -o loto7-api-linux ./cmd/api
+
+# Windows
+GOOS=windows GOARCH=amd64 go build -o loto7-api.exe ./cmd/api
 ```
 
-## Docker
+### 3. サーバー配置
+```bash
+# ディレクトリを作成
+mkdir -p /opt/loto7-api
+cd /opt/loto7-api
 
-This project includes Docker support for easy deployment and execution.
+# バイナリとキャッシュディレクトリをコピー
+cp /path/to/loto7-api-linux ./loto7-api
+cp -r /path/to/cache ./cache
 
-### Building the Docker image
+# 実行権限
+chmod +x loto7-api
+```
+
+### 4. APIサーバー起動
+
+#### フォアグラウンド
+```bash
+# 本番モードで起動
+GIN_MODE=release ./loto7-api
+```
+
+#### バックグラウンド
+```bash
+# （nohup
+nohup GIN_MODE=release ./loto7-api > loto7-api.log 2>&1 &
+
+# プロセスID
+ps aux | grep loto7-api
+```
+
+#### systemdサービスとして起動
+`/etc/systemd/system/loto7-api.service` を作成：
+
+```ini
+[Unit]
+Description=Loto7 API Server
+After=network.target
+
+[Service]
+Type=simple
+User=loto7
+Group=loto7
+WorkingDirectory=/opt/loto7-api
+ExecStart=/opt/loto7-api/loto7-api
+Environment=GIN_MODE=release
+Environment=PORT=8080
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
 
 ```bash
-docker build -t loto7-promise .
+# 有効化
+sudo systemctl enable loto7-api
+
+# 起動
+sudo systemctl start loto7-api
+
+# サービス状態確認
+sudo systemctl status loto7-api
+
+# ログ確認
+sudo journalctl -u loto7-api -f
 ```
 
-### Running with Docker
+### 5. サーバー管理コマンド
 
-Run the result application:
+#### サーバーの停止
 ```bash
-# Show usage
-docker run --rm loto7-promise
+# プロセスIDを確認して終了
+pkill loto7-api
 
-# Get past 10 results  
-docker run --rm loto7-promise ./result 10
+# systemdの場合
+sudo systemctl stop loto7-api
 ```
 
-Run the frequent numbers application:
+#### サーバー再起動
 ```bash
-docker run --rm loto7-promise ./frequentNumbers
+# systemdの場合
+sudo systemctl restart loto7-api
 ```
 
-Run the number count application:
+#### サーバーのアップデート
 ```bash
-# Count specific number appearances
-docker run --rm loto7-promise ./numberCount -number=7 -range=100
+# 最新コードをプル
+git pull origin main
 
-# Count multiple numbers
-docker run --rm loto7-promise ./numberCount -number=1,7,23 -range=50
+# 新しいバイナリをビルド
+go build -o loto7-api-new ./cmd/api
+
+# サービスを停止
+sudo systemctl stop loto7-api
+
+# バイナリを置き換え
+mv loto7-api-new loto7-api
+
+# サービスを再起動
+sudo systemctl start loto7-api
 ```
 
-Run the consecutive pattern analysis application:
+#### ログ監視
 ```bash
-# Analyze consecutive and same-digit patterns (default: 100 draws)
-docker run --rm loto7-promise ./consecutivePattern
+# nohupの場合
+tail -f loto7-api.log
 
-# Analyze patterns for specific range
-docker run --rm loto7-promise ./consecutivePattern -range=200
+# systemdの場合
+sudo journalctl -u loto7-api -f
 ```
 
-Run the heatmap analysis application:
+### 6. エンドポイント確認
+
+#### API エンドポイントテスト
 ```bash
-# Generate position-based heatmap (default: 50 draws)
-docker run --rm loto7-promise ./heatmap
+# ヘルスチェック
+curl http://localhost:8080/health
 
-# Generate heatmap for specific range
-docker run --rm loto7-promise ./heatmap -range=100
+# 抽選結果取得
+curl http://localhost:8080/api/results?count=10
 
-# Show specific number's position details
-docker run --rm loto7-promise ./heatmap -number=7 -range=100
+# ヒートマップ
+curl http://localhost:8080/api/heatmap
 
-# Show specific position's number details
-docker run --rm loto7-promise ./heatmap -position=1
-
-# Output in JSON format
-docker run --rm loto7-promise ./heatmap -json -range=30
+# 推薦番号生成
+curl http://localhost:8080/api/recommendation
 ```
-
-### Using Docker Compose
-
-For easier management, use Docker Compose:
-
-```bash
-# Build all services
-docker compose build
-
-# Run result service with argument
-docker compose run --rm result ./result 5
-
-# Run frequent numbers service
-docker compose run --rm frequent
-
-# Run interactive shell
-docker compose run --rm interactive
-```
-
-### Image Details
-
-- **Base images**: golang:1.23-alpine (build) + alpine:latest (runtime)
-- **Image size**: ~39MB
-- **Applications**: Both `result` and `frequentNumbers` binaries included
-- **Security**: Runs as non-root user `appuser`
-- **Dependencies**: All Go dependencies vendored for offline builds

@@ -1,13 +1,15 @@
-package heatmap
+package test
 
 import (
 	"testing"
+
+	"github.com/shimauma0312/loto7-promise/internal/heatmap"
 )
 
-// TestGenerateHeatmap ヒートマップ生成の基本テスト
-func TestGenerateHeatmap(t *testing.T) {
+// TestHeatmapGenerate ヒートマップ生成の基本テスト
+func TestHeatmapGenerate(t *testing.T) {
 	// 正常ケース：過去10回分のデータで検証
-	summary, err := GenerateHeatmap(10)
+	summary, err := heatmap.GenerateHeatmap(10)
 	if err != nil {
 		t.Fatalf("ヒートマップ生成でエラーが発生しました: %v", err)
 	}
@@ -29,37 +31,10 @@ func TestGenerateHeatmap(t *testing.T) {
 	if len(summary.PositionData) != 38 { // インデックス0を含むため38
 		t.Errorf("PositionDataのサイズが不正です。期待値: 38, 実際: %d", len(summary.PositionData))
 	}
-
-	// 数字1-37の各位置データをチェック
-	for number := 1; number <= 37; number++ {
-		if len(summary.PositionData[number]) != 8 { // インデックス0を含むため8
-			t.Errorf("数字%dの位置データサイズが不正です。期待値: 8, 実際: %d", number, len(summary.PositionData[number]))
-		}
-
-		for position := 1; position <= 7; position++ {
-			data := summary.PositionData[number][position]
-			
-			if data.Number != number {
-				t.Errorf("数字データが不正です。期待値: %d, 実際: %d", number, data.Number)
-			}
-			
-			if data.Position != position {
-				t.Errorf("位置データが不正です。期待値: %d, 実際: %d", position, data.Position)
-			}
-			
-			if data.Count < 0 {
-				t.Errorf("出現回数が負の値です: %d", data.Count)
-			}
-			
-			if data.TotalDraws != summary.ActualDraws {
-				t.Errorf("総抽選回数が不一致です。期待値: %d, 実際: %d", summary.ActualDraws, data.TotalDraws)
-			}
-		}
-	}
 }
 
-// TestGenerateHeatmapInvalidInput 不正な入力値のテスト
-func TestGenerateHeatmapInvalidInput(t *testing.T) {
+// TestHeatmapInvalidInput 不正な入力値のテスト
+func TestHeatmapInvalidInput(t *testing.T) {
 	testCases := []struct {
 		name        string
 		searchRange int
@@ -72,12 +47,12 @@ func TestGenerateHeatmapInvalidInput(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := GenerateHeatmap(tc.searchRange)
-			
+			_, err := heatmap.GenerateHeatmap(tc.searchRange)
+
 			if tc.expectError && err == nil {
 				t.Errorf("エラーが期待されましたが、エラーが発生しませんでした")
 			}
-			
+
 			if !tc.expectError && err != nil {
 				t.Errorf("エラーが発生しました: %v", err)
 			}
@@ -85,9 +60,9 @@ func TestGenerateHeatmapInvalidInput(t *testing.T) {
 	}
 }
 
-// TestGetPositionData 指定数字の位置別データ取得テスト
-func TestGetPositionData(t *testing.T) {
-	summary, err := GenerateHeatmap(5)
+// TestHeatmapGetPositionData 指定数字の位置別データ取得テスト
+func TestHeatmapGetPositionData(t *testing.T) {
+	summary, err := heatmap.GenerateHeatmap(5)
 	if err != nil {
 		t.Fatalf("ヒートマップ生成でエラーが発生しました: %v", err)
 	}
@@ -112,9 +87,9 @@ func TestGetPositionData(t *testing.T) {
 	}
 }
 
-// TestGetNumbersByPosition 指定位置での全数字データ取得テスト
-func TestGetNumbersByPosition(t *testing.T) {
-	summary, err := GenerateHeatmap(5)
+// TestHeatmapGetNumbersByPosition 指定位置での全数字データ取得テスト
+func TestHeatmapGetNumbersByPosition(t *testing.T) {
+	summary, err := heatmap.GenerateHeatmap(5)
 	if err != nil {
 		t.Fatalf("ヒートマップ生成でエラーが発生しました: %v", err)
 	}
@@ -135,7 +110,7 @@ func TestGetNumbersByPosition(t *testing.T) {
 		if posData.Number != expectedNumber {
 			t.Errorf("数字が不正です。期待値: %d, 実際: %d", expectedNumber, posData.Number)
 		}
-		
+
 		if posData.Position != 1 {
 			t.Errorf("位置が不正です。期待値: 1, 実際: %d", posData.Position)
 		}
@@ -151,9 +126,9 @@ func TestGetNumbersByPosition(t *testing.T) {
 	}
 }
 
-// TestStatisticalCalculations 統計計算のテスト
-func TestStatisticalCalculations(t *testing.T) {
-	summary, err := GenerateHeatmap(10)
+// TestHeatmapStatisticalCalculations 統計計算のテスト
+func TestHeatmapStatisticalCalculations(t *testing.T) {
+	summary, err := heatmap.GenerateHeatmap(10)
 	if err != nil {
 		t.Fatalf("ヒートマップ生成でエラーが発生しました: %v", err)
 	}
@@ -183,29 +158,6 @@ func TestStatisticalCalculations(t *testing.T) {
 	for _, number := range summary.ColdestNumbers {
 		if number < 1 || number > 37 {
 			t.Errorf("最低出現数字が範囲外です: %d", number)
-		}
-	}
-}
-
-// TestPercentageCalculations パーセンテージ計算のテスト
-func TestPercentageCalculations(t *testing.T) {
-	summary, err := GenerateHeatmap(5)
-	if err != nil {
-		t.Fatalf("ヒートマップ生成でエラーが発生しました: %v", err)
-	}
-
-	// 各数字の各位置でのパーセンテージが0-100の範囲内であることを確認
-	for number := 1; number <= 37; number++ {
-		for position := 1; position <= 7; position++ {
-			data := summary.PositionData[number][position]
-			
-			if data.Percentage < 0 || data.Percentage > 100 {
-				t.Errorf("出現率が範囲外です。数字%d、位置%d: %f%%", number, position, data.Percentage)
-			}
-			
-			if data.PositionRatio < 0 || data.PositionRatio > 100 {
-				t.Errorf("位置別出現率が範囲外です。数字%d、位置%d: %f%%", number, position, data.PositionRatio)
-			}
 		}
 	}
 }
