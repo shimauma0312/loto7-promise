@@ -19,8 +19,9 @@ func getLastFriday(t time.Time) time.Time {
 func NewNumber() int {
 	today := time.Now()
 
-	baseFriday := time.Date(2024, 9, 6, 0, 0, 0, 0, time.Local)
-	baseNumber := 591
+	// 2025年10月18日を第648回の基準日
+	baseFriday := time.Date(2025, 10, 18, 0, 0, 0, 0, time.Local)
+	baseNumber := 648
 
 	targetFriday := getLastFriday(today)
 
