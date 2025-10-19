@@ -198,12 +198,12 @@ func getResultsWithCount(c *gin.Context) {
 	}
 
 	// 結果を取得
-	results := result.GetResult(count)
-	if results == nil {
+	results, err := result.GetResultWithDate(count)
+	if err != nil {
 		response := api.ErrorResponse(
-			"DATA_FETCH_ERROR",
+			"DATA_RETRIEVAL_ERROR",
 			"データの取得に失敗しました",
-			"Failed to fetch lottery results",
+			err.Error(),
 		)
 		c.JSON(http.StatusInternalServerError, response)
 		return
@@ -212,18 +212,11 @@ func getResultsWithCount(c *gin.Context) {
 	// レスポンス用にデータを変換
 	apiResults := make([]api.DrawResultAPI, len(results))
 	for i, res := range results {
-		drawNumber := 0
-		if len(results) > 0 {
-			// 最新の回数から逆算
-			latestDrawNum := result.NewNumber()
-			drawNumber = latestDrawNum - i
-		}
-
 		apiResults[i] = api.DrawResultAPI{
-			DrawNumber:       drawNumber,
-			Numbers:          res,
-			Date:             time.Now().Format("2006-01-02"),
-			FormattedNumbers: strings.Join(res, "-"),
+			DrawNumber:       res.DrawNumber,
+			Numbers:          res.Numbers,
+			Date:             res.Date,
+			FormattedNumbers: strings.Join(res.Numbers, "-"),
 		}
 	}
 

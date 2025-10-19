@@ -22,6 +22,13 @@ type DrawResult struct {
 	Date       string   `json:"date"`
 }
 
+// DrawResultWithDate 抽選結果
+type DrawResultWithDate struct {
+	DrawNumber int      `json:"draw_number"`
+	Numbers    []string `json:"numbers"`
+	Date       string   `json:"date"`
+}
+
 // キャッシュディレクトリのパス
 const (
 	CacheDir     = "cache"
@@ -29,7 +36,7 @@ const (
 	MetadataFile = "cache/metadata.json"
 )
 
-// GetResult 過去の抽選結果を取得（キャッシュ機能付き）
+// GetResult 過去の抽選結果を取得
 func GetResult(repeatNum int) [][]string {
 	// キャッシュから結果を取得
 	results, err := getCachedResults(repeatNum)
@@ -39,6 +46,18 @@ func GetResult(repeatNum int) [][]string {
 	}
 
 	return results
+}
+
+// GetResultWithDate 過去の抽選結果を日付情報付きで取得
+func GetResultWithDate(repeatNum int) ([]DrawResultWithDate, error) {
+	// キャッシュから結果を取得
+	cachedData, err := getCachedResultsWithDate(repeatNum)
+	if err != nil {
+		// キャッシュからの取得に失敗した場合は従来の方法で取得
+		return getResultDirectWithDate(repeatNum), nil
+	}
+
+	return cachedData, nil
 }
 
 // GetResultDirect 従来の直接ダウンロード
@@ -247,7 +266,7 @@ func getCachedResults(repeatNum int) ([][]string, error) {
 			drawResult := DrawResult{
 				DrawNumber: drawNum,
 				Numbers:    record,
-				Date:       time.Now().Format("2006-01-02"),
+				Date:       GetDrawDate(drawNum), // 実際の抽選日を計算
 			}
 			additionalData = append(additionalData, drawResult)
 
@@ -282,4 +301,104 @@ func getCachedResults(repeatNum int) ([][]string, error) {
 	}
 
 	return results, nil
+}
+
+// getCachedResultsWithDate キャッシュから指定回数分の結果を日付情報付きで取得
+func getCachedResultsWithDate(repeatNum int) ([]DrawResultWithDate, error) {
+	if err := updateCache(); err != nil {
+		return nil, err
+	}
+
+	cachedData, err := loadCachedData()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cachedData) == 0 {
+		return nil, fmt.Errorf("キャッシュデータが存在しません")
+	}
+
+	// 要求された回数分のデータが不足している場合、追加取得
+	if len(cachedData) < repeatNum {
+		currentDrawNum := NewNumber()
+		oldestCachedDrawNum := cachedData[len(cachedData)-1].DrawNumber
+		startDrawNum := oldestCachedDrawNum - (repeatNum - len(cachedData))
+
+		if startDrawNum < 1 {
+			startDrawNum = 1
+		}
+
+		var additionalData []DrawResult
+		for drawNum := oldestCachedDrawNum - 1; drawNum >= startDrawNum; drawNum-- {
+			record, err := GetCsv(drawNum)
+			if err != nil {
+				continue
+			}
+
+			drawResult := DrawResult{
+				DrawNumber: drawNum,
+				Numbers:    record,
+				Date:       GetDrawDate(drawNum), // 実際の抽選日を計算
+			}
+			additionalData = append(additionalData, drawResult)
+
+			time.Sleep(1 * time.Second)
+		}
+
+		// データを更新
+		updatedData := append(cachedData, additionalData...)
+		if err := saveCachedData(updatedData); err != nil {
+			return nil, err
+		}
+
+		metadata := &CacheMetadata{
+			LastUpdated:   time.Now(),
+			LatestDrawNum: currentDrawNum,
+			TotalRecords:  len(updatedData),
+		}
+
+		if err := saveMetadata(metadata); err != nil {
+			return nil, err
+		}
+
+		cachedData = updatedData
+	}
+
+	var results []DrawResultWithDate
+	for i := 0; i < repeatNum && i < len(cachedData); i++ {
+		results = append(results, DrawResultWithDate{
+			DrawNumber: cachedData[i].DrawNumber,
+			Numbers:    cachedData[i].Numbers,
+			Date:       cachedData[i].Date,
+		})
+	}
+
+	return results, nil
+}
+
+// getResultDirectWithDate 従来の直接ダウンロード（日付情報付き）
+func getResultDirectWithDate(repeatNum int) []DrawResultWithDate {
+	newNum := NewNumber()
+
+	var results []DrawResultWithDate
+	for i := 0; i < repeatNum; i++ {
+		drawNum := newNum - i
+		if drawNum < 1 {
+			break
+		}
+
+		record, err := GetCsv(drawNum)
+		if err != nil {
+			continue
+		}
+
+		result := DrawResultWithDate{
+			DrawNumber: drawNum,
+			Numbers:    record,
+			Date:       GetDrawDate(drawNum), // 実際の抽選日を計算
+		}
+		results = append(results, result)
+	}
+
+	return results
 }
