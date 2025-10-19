@@ -2,7 +2,7 @@
 # Loto7 Promise - 超シンプル版
 # ================================
 
-.PHONY: help up down shell clean build test recommend
+.PHONY: help up down shell clean build test test-unit test-integration test-performance test-bench recommend
 
 # デフォルトのヘルプ表示
 help:
@@ -16,9 +16,15 @@ help:
 	@echo ""
 	@echo "  make recommend - ロト7推薦番号を生成"
 	@echo ""
+	@echo "テスト関連:"
+	@echo "  make test               - 全テストを実行"
+	@echo "  make test-unit          - ユニットテストのみ実行"
+	@echo "  make test-integration   - 統合テストのみ実行"
+	@echo "  make test-performance   - パフォーマンステスト実行"
+	@echo "  make test-bench         - ベンチマークテスト実行"
+	@echo ""
 	@echo "その他:"
 	@echo "  make build    - 全実行ファイルをビルド"
-	@echo "  make test     - 全テストを実行"
 	@echo "  make clean    - 全部お掃除"
 	@echo ""
 
@@ -66,9 +72,33 @@ build:
 
 # 全テストを実行
 test:
-	@echo "🧪 テスト実行中..."
-	go test ./...
-	@echo "✅ テスト完了"
+	@echo "🧪 統合テストを実行中..."
+	go test ./test/ -v
+	@echo "✅ 全テスト完了"
+
+# 個別テストを実行
+test-unit:
+	@echo "🧪 ユニットテスト実行中..."
+	go test ./test/ -v -run "Test[^I]"
+	@echo "✅ ユニットテスト完了"
+
+# 統合テストのみ実行
+test-integration:
+	@echo "🧪 統合テスト実行中..."
+	go test ./test/ -v -run "TestIntegration"
+	@echo "✅ 統合テスト完了"
+
+# パフォーマンステストを実行
+test-performance:
+	@echo "🧪 パフォーマンステスト実行中..."
+	go test ./test/ -v -run "TestPerformance"
+	@echo "✅ パフォーマンステスト完了"
+
+# ベンチマークテストを実行
+test-bench:
+	@echo "🧪 ベンチマークテスト実行中..."
+	go test ./test/ -bench=. -benchmem
+	@echo "✅ ベンチマークテスト完了"
 
 # ロト7推薦番号を生成
 recommend:
