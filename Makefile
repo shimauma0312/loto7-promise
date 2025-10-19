@@ -27,20 +27,13 @@ up:
 # コンテナに入る
 shell:
 	@echo "🔧 コンテナに入ります..."
-	@echo "💡 コンテナ内でのコマンド例:"
-	@echo "   go run ./cmd/result"
-	@echo "   go run ./cmd/frequentNumbers"
-	@echo "   go run ./cmd/numberCount -number=7 -range=100"
-	@echo "   go run ./cmd/consecutivePattern -range=100"
-	@echo "   go run ./cmd/heatmap -range=50"
-	@echo "   go run ./cmd/heatmap -number=7 -range=100"
-	@echo "   go run ./cmd/heatmap -position=1 -json"
-	@echo "   go run ./cmd/randomPrediction -count=5 -range=200"
-	@echo "   go run ./cmd/randomPrediction -random -count=3"
-	@echo "   go run ./cmd/bonusNumber -trend -top=15 -range=100"
-	@echo "   go run ./cmd/bonusNumber -number=7 -range=50"
-	@echo "   go build ./cmd/result"
-	@echo "   go test ./..."
+	@echo "💡 利用可能なコマンド:"
+	@echo "   go run ./cmd/result [回数]              - 過去N回分の抽選結果取得"
+	@echo "   go run ./cmd/heatmap -range=50          - 過去50回分のヒートマップ分析"
+	@echo "   go run ./cmd/heatmap -number=7 -range=100 - 数字7の詳細分析"
+	@echo "   go run ./cmd/heatmap -position=1 -json  - 1番目位置をJSON出力"
+	@echo "   go build ./cmd/result                   - 実行ファイル生成"
+	@echo "   go test ./...                          - テスト実行"
 	@echo ""
 	docker-compose exec dev sh
 
