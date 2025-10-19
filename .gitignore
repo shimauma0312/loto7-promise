@@ -1,3 +1,20 @@
+# キャッシュディレクトリ
+cache/
+
+# Goビルド成果物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# テスト関連
+*.test
+*.out
+
+# IDE設定（個人設定のみ）
+.vscode/launch.json
+
 # Ignore user-specific settings
 .vscode/settings.json
 
