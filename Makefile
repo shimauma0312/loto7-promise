@@ -23,7 +23,7 @@ help:
 	@echo "テスト関連:"
 	@echo "  make test               - 全テストを実行"
 	@echo "  make test-unit          - ユニットテストのみ実行"
-	@echo "  make test-integration   - 統合テストのみ実行"
+	@echo "  make test-integration   - 全テストのみ実行"
 	@echo "  make test-performance   - パフォーマンステスト実行"
 	@echo "  make test-bench         - ベンチマークテスト実行"
 	@echo ""
@@ -76,7 +76,7 @@ build:
 
 # 全テストを実行
 test:
-	@echo "統合テストを実行中..."
+	@echo "全テストを実行中..."
 	go test ./test/ -v
 	@echo "全テスト完了"
 
@@ -86,11 +86,11 @@ test-unit:
 	go test ./test/ -v -run "Test[^I]"
 	@echo "ユニットテスト完了"
 
-# 統合テストのみ実行
+# 全テストのみ実行
 test-integration:
-	@echo "統合テスト実行中..."
+	@echo "全テスト実行中..."
 	go test ./test/ -v -run "TestIntegration"
-	@echo "統合テスト完了"
+	@echo "全テスト完了"
 
 # パフォーマンステストを実行
 test-performance:

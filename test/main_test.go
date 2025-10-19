@@ -9,7 +9,7 @@ import (
 
 // TestMain 全テストのエントリーポイント
 func TestMain(m *testing.M) {
-	fmt.Println("=== ロト7 Promise 統合テスト開始 ===")
+	fmt.Println("=== ロト7 Promise 全テスト開始 ===")
 	fmt.Println("テスト実行時刻:", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println()
 
@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 	} else {
 		fmt.Println("❌ テストに失敗しました")
 	}
-	fmt.Println("=== ロト7 Promise 統合テスト終了 ===")
+	fmt.Println("=== ロト7 Promise 全テスト終了 ===")
 
 	os.Exit(exitCode)
 }
@@ -47,10 +47,10 @@ func teardownTests() {
 	fmt.Println("✅ クリーンアップ完了")
 }
 
-// TestIntegration 統合テスト
+// TestIntegration 全テスト
 func TestIntegration(t *testing.T) {
-	t.Run("全機能統合テスト", func(t *testing.T) {
-		t.Log("結果取得、ヒートマップ生成、推薦機能の統合テストを実行")
+	t.Run("全機能全テスト", func(t *testing.T) {
+		t.Log("結果取得、ヒートマップ生成、推薦機能の全テストを実行")
 
 		// 各機能が最低限動作することを確認
 		t.Run("結果取得機能", func(t *testing.T) {
