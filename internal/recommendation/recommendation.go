@@ -453,3 +453,13 @@ func (re *RecommendationEngine) FormatRecommendations(recommendations [][]int) s
 
 	return result.String()
 }
+
+// GetConfig 設定情報を取得
+func (re *RecommendationEngine) GetConfig() RecommendationConfig {
+	return re.config
+}
+
+// GetAnalyzedDrawsCount 分析した抽選回数を取得
+func (re *RecommendationEngine) GetAnalyzedDrawsCount() int {
+	return len(re.results)
+}
