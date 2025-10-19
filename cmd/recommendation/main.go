@@ -1,0 +1,94 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+
+	"github.com/shimauma0312/loto7-promise/internal/recommendation"
+)
+
+func main() {
+	var (
+		count            = flag.Int("count", 100, "分析する過去の抽選回数")
+		maxRecommend     = flag.Int("max", 5, "生成する推薦組み合わせの数")
+		recentAvoid      = flag.Int("avoid", 3, "直近で避ける抽選回数")
+		consecutiveBoost = flag.Int("boost", 3, "連続出現ブースト判定回数")
+		showScores       = flag.Bool("scores", false, "各数字のスコア詳細を表示")
+		help             = flag.Bool("help", false, "ヘルプを表示")
+	)
+
+	flag.Parse()
+
+	if *help {
+		showHelp()
+		return
+	}
+
+	// 推薦エンジンの設定
+	config := recommendation.DefaultConfig()
+	config.MaxRecommendations = *maxRecommend
+	config.RecentAvoidCount = *recentAvoid
+	config.ConsecutiveBoost = *consecutiveBoost
+
+	// エンジンを作成
+	engine := recommendation.NewRecommendationEngine(config)
+
+	// データを読み込み
+	fmt.Printf("過去%d回分のデータを分析中...\n", *count)
+	if err := engine.LoadData(*count); err != nil {
+		fmt.Printf("エラー: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 推薦組み合わせを生成
+	recommendations, err := engine.GenerateRecommendations()
+	if err != nil {
+		fmt.Printf("推薦生成エラー: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 結果を表示
+	result := engine.FormatRecommendations(recommendations)
+	fmt.Print(result)
+
+	// スコア詳細を表示（オプション）
+	if *showScores {
+		fmt.Println("\n=== 数字別スコア詳細 ===")
+		showDetailedScores(engine)
+	}
+
+	// 人間の感覚による推薦ロジックの説明
+	showRecommendationLogic()
+}
+
+func showHelp() {
+	fmt.Println("ロト7推薦ツール")
+	fmt.Println()
+	fmt.Println("使用方法:")
+	fmt.Println("  recommendation [オプション]")
+	fmt.Println()
+	fmt.Println("オプション:")
+	fmt.Println("  -count int      分析する過去の抽選回数 (デフォルト: 100)")
+	fmt.Println("  -max int        生成する推薦組み合わせの数 (デフォルト: 5)")
+	fmt.Println("  -avoid int      直近で避ける抽選回数 (デフォルト: 3)")
+	fmt.Println("  -boost int      連続出現ブースト判定回数 (デフォルト: 3)")
+	fmt.Println("  -scores         各数字のスコア詳細を表示")
+	fmt.Println("  -help           このヘルプを表示")
+	fmt.Println()
+	fmt.Println("例:")
+	fmt.Println("  recommendation -count 150 -max 3")
+	fmt.Println("  recommendation -scores")
+}
+
+func showDetailedScores(engine *recommendation.RecommendationEngine) {
+	// この関数は推薦エンジンからスコア情報を取得して表示します
+	// 実装はrecommendationパッケージでスコア情報を公開する必要があります
+	fmt.Println("（スコア詳細表示は今後の実装で対応予定）")
+}
+
+func showRecommendationLogic() {
+	fmt.Println()
+	fmt.Println("=== 推薦ロジック ===")
+	fmt.Println("設定と統計に基づき候補を自動生成します。")
+}
