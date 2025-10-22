@@ -1,6 +1,6 @@
 module github.com/shimauma0312/loto7-promise
 
-go 1.23
+go 1.25.3
 
 require golang.org/x/text v0.27.0
 
