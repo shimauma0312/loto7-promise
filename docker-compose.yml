@@ -1,22 +1,19 @@
 services:
-  # 開発用Go環境 - 1個だけあればOK
-  # 使い方：
   #   docker-compose up -d --build
   #   docker-compose exec dev sh
   #   その後コンテナ内で: go run ./cmd/result など
   dev:
-    image: golang:1.23-alpine
+    image: golang:1.25-alpine
     working_dir: /app
     volumes:
-      - .:/app                    # ソースコードをマウント
-      - go-cache:/go/pkg/mod      # Goモジュールキャッシュで高速化
+      - .:/app
+      - go-cache:/go/pkg/mod
     environment:
       - CGO_ENABLED=0
     container_name: loto7-dev
-    # コンテナを起動し続ける（execで入るため）
     command: ["tail", "-f", "/dev/null"]
     stdin_open: true
     tty: true
 
 volumes:
-  go-cache:  # Goモジュールキャッシュ用
+  go-cache:
