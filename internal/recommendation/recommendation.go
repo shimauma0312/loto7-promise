@@ -2,9 +2,11 @@ package recommendation
 
 import (
 	"fmt"
+	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/shimauma0312/loto7-promise/internal/result"
 )
@@ -51,20 +53,24 @@ type CombinationHistory struct {
 	Pairs map[string]int // "num1,num2"形式のペア出現回数
 }
 
-// RecommendationEngine 推薦エンジン
+// RecommendationEngine 推薦エンジンのすとらくと
 type RecommendationEngine struct {
 	config  RecommendationConfig
 	results [][]string
 	history CombinationHistory
+	rng     *rand.Rand
 }
 
 // NewRecommendationEngine 推薦エンジンを作成
 func NewRecommendationEngine(config RecommendationConfig) *RecommendationEngine {
+	// 現在時刻をシードにしてランダムジェネレータ初期化
+	source := rand.NewSource(time.Now().UnixNano())
 	return &RecommendationEngine{
 		config: config,
 		history: CombinationHistory{
 			Pairs: make(map[string]int),
 		},
+		rng: rand.New(source),
 	}
 }
 
@@ -89,7 +95,7 @@ func (re *RecommendationEngine) buildCombinationHistory() {
 				num1, _ := strconv.Atoi(numbers[i])
 				num2, _ := strconv.Atoi(numbers[j])
 
-				// ペアキーを作成（小さい数字,大きい数字の順）
+				// ペアキー作成（小さい数字,大きい数字の順）
 				var pairKey string
 				if num1 < num2 {
 					pairKey = fmt.Sprintf("%d,%d", num1, num2)
@@ -103,7 +109,7 @@ func (re *RecommendationEngine) buildCombinationHistory() {
 	}
 }
 
-// calculateNumberScores 各数字のスコアを計算
+// calculateNumberScores 各数字のスコア計算
 func (re *RecommendationEngine) calculateNumberScores() []NumberScore {
 	scores := make([]NumberScore, 37) // 1-37の数字
 
@@ -292,11 +298,12 @@ func (re *RecommendationEngine) GenerateRecommendations() ([][]int, error) {
 
 	var recommendations [][]int
 
+	// 各推薦を生成
 	for rec := 0; rec < re.config.MaxRecommendations; rec++ {
-		// 各推薦で異なる組み合わせを生成するため、試行回数を制限
-		maxAttempts := 50
+		maxAttempts := 100 // 試行回数を増やす
 		for attempt := 0; attempt < maxAttempts; attempt++ {
-			combination := re.generateSingleRecommendation(scores, recommendations, rec+attempt)
+			// 確率選択でバリエーションをつくる
+			combination := re.generateWeightedRandomRecommendation(scores, recommendations)
 			if len(combination) == 7 && !re.isDuplicateCombination(combination, recommendations) {
 				recommendations = append(recommendations, combination)
 				break
@@ -403,6 +410,158 @@ func (re *RecommendationEngine) isValidAddition(num int, currentComb []int, exis
 	}
 
 	return true
+}
+
+// 重み付きランダム選択で組み合わせを生成する
+func (re *RecommendationEngine) generateWeightedRandomRecommendation(scores []NumberScore, existing [][]int) []int {
+	var combination []int
+	usedNumbers := make(map[int]bool)
+
+	// 数字の選択範囲を決める（低い数字から高い数字まで）
+	lowRange := []NumberScore{}    // 1-15の範囲
+	midRange := []NumberScore{}    // 16-25の範囲
+	highRange := []NumberScore{}   // 26-37の範囲
+
+	// スコアベースで各範囲に分類
+	for _, score := range scores {
+		if score.FrequencyScore == 0 {
+			continue // 出現していない数字はスキップ
+		}
+		
+		if score.Number <= 15 {
+			lowRange = append(lowRange, score)
+		} else if score.Number <= 25 {
+			midRange = append(midRange, score)
+		} else {
+			highRange = append(highRange, score)
+		}
+	}
+
+	ranges := [][]NumberScore{lowRange, midRange, highRange}
+	minFromEachRange := []int{2, 2, 2} // 各範囲から最低選ぶ数
+
+	// 各範囲から選択
+	for rangeIdx, numberRange := range ranges {
+		if len(numberRange) == 0 {
+			continue
+		}
+
+		selectedFromRange := 0
+		maxAttempts := 50
+
+		for selectedFromRange < minFromEachRange[rangeIdx] && len(combination) < 7 && maxAttempts > 0 {
+			maxAttempts--
+			
+			// 重み付きランダム選択
+			selectedNum := re.weightedRandomSelect(numberRange, usedNumbers)
+			if selectedNum == 0 {
+				break
+			}
+
+			if !usedNumbers[selectedNum] && re.isValidNumberForPosition(selectedNum, combination) {
+				combination = append(combination, selectedNum)
+				usedNumbers[selectedNum] = true
+				selectedFromRange++
+			}
+		}
+	}
+
+	// 残りのスロットを全範囲から選択
+	allValidNumbers := append(append(lowRange, midRange...), highRange...)
+	maxAttempts := 100
+
+	for len(combination) < 7 && maxAttempts > 0 {
+		maxAttempts--
+		
+		selectedNum := re.weightedRandomSelect(allValidNumbers, usedNumbers)
+		if selectedNum == 0 {
+			break
+		}
+
+		if !usedNumbers[selectedNum] && re.isValidNumberForPosition(selectedNum, combination) {
+			combination = append(combination, selectedNum)
+			usedNumbers[selectedNum] = true
+		}
+	}
+
+	sort.Ints(combination)
+	return combination
+}
+
+// weightedRandomSelect 重み付きランダム選択
+func (re *RecommendationEngine) weightedRandomSelect(candidates []NumberScore, usedNumbers map[int]bool) int {
+	if len(candidates) == 0 {
+		return 0
+	}
+
+	// 利用可能な候補をフィルタリング
+	var availableCandidates []NumberScore
+	var totalWeight float64
+
+	for _, candidate := range candidates {
+		if !usedNumbers[candidate.Number] {
+			availableCandidates = append(availableCandidates, candidate)
+			// スコアが高いほど選ばれやすいが、ランダム性も保持する
+			weight := candidate.TotalScore + 1.0 // 最低限の重み
+			totalWeight += weight
+		}
+	}
+
+	if len(availableCandidates) == 0 || totalWeight == 0 {
+		return 0
+	}
+
+	// ランダム値を生成
+	randomValue := re.rng.Float64() * totalWeight
+	currentWeight := 0.0
+
+	// 重み付きランダム選択実行
+	for _, candidate := range availableCandidates {
+		weight := candidate.TotalScore + 1.0
+		currentWeight += weight
+		if randomValue <= currentWeight {
+			return candidate.Number
+		}
+	}
+
+	// フォールバック（統計的にはここに到達しないはず）
+	if len(availableCandidates) > 0 {
+		return availableCandidates[re.rng.Intn(len(availableCandidates))].Number
+	}
+
+	return 0
+}
+
+// isValidNumberForPosition 位置に応じた数字の妥当性チェック
+func (re *RecommendationEngine) isValidNumberForPosition(num int, currentComb []int) bool {
+	// 既存の組み合わせとの相性をチェック
+	for _, existingNum := range currentComb {
+		// 連続した数字が多すぎないかチェック
+		if abs(num-existingNum) == 1 {
+			consecutiveCount := 0
+			for i := 0; i < len(currentComb); i++ {
+				for j := i + 1; j < len(currentComb); j++ {
+					if abs(currentComb[i]-currentComb[j]) == 1 {
+						consecutiveCount++
+					}
+				}
+			}
+			// 連続数字のペアが2つ以上ある場合は避ける
+			if consecutiveCount >= 2 {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// abs 絶対値計算
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // fillCombination 組み合わせを7個まで補完

@@ -68,10 +68,10 @@ curl http://localhost:8080/api/recommendation
 go build -o loto7-api ./cmd/api
 
 # Linux
-GOOS=linux GOARCH=amd64 go build -o loto7-api-linux ./cmd/api
+GOOS=linux GOARCH=arm64 go build -o loto7-api-linux ./cmd/api
 
 # Windows
-GOOS=windows GOARCH=amd64 go build -o loto7-api.exe ./cmd/api
+GOOS=windows GOARCH=arm64 go build -o loto7-api.exe ./cmd/api
 ```
 
 ### 3. サーバー配置
