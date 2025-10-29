@@ -32,7 +32,7 @@ type NumberScore struct {
 
 ### 1. 出現頻度スコア (FrequencyScore)
 過去に出現した回数で選択確率を評価する
-- **計算方法**: `出現回数 / 全体の最大出現回数 * 100`
+- **計算方法**: `出現回数 / 分析対象の回数`
 - **重み**: `FrequencyWeight` (デフォルト: 0.4)
 
 ### 2. 最近の出現スコア (RecentScore)
