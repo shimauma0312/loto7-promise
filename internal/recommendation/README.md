@@ -101,8 +101,8 @@ type RecommendationConfig struct {
     RecentAvoidCount   int     // 直近回避回数（デフォルト: 3）
     ConsecutiveBoost   int     // 連続出現ブースト判定回数（デフォルト: 3）
     HistoryLookback    int     // 過去履歴確認回数（デフォルト: 100）
-    FrequencyWeight    float64 // 出現頻度重み（デフォルト: 0.4）
-    RecentWeight       float64 // 最近出現重み（デフォルト: 0.3）
+    FrequencyWeight    float64 // 出現頻度重み（デフォルト: 0.3）
+    RecentWeight       float64 // 最近出現重み（デフォルト: 0.4）
     ConsecutiveWeight  float64 // 連続出現重み（デフォルト: 0.2）
     PositionWeight     float64 // 位置重み（デフォルト: 0.1）
 }
