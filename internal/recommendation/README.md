@@ -1,22 +1,66 @@
-過去のロト7抽選結果を統計分析して良い感じの組み合わせを出力する。
 
-- **重みでランダム選択**: スコアが高い数字ほど選ばれやすいが、完全に固定はしない
-- **範囲別選択**: 低い数字・中間・高い数字の各範囲からバランスを選択する。
-- **ランダム性**: 時刻ベースシードを使ってある程度のランダム性を保つ
+### 1. 分析フェーズ
+
+#### 出現頻度分析
+- 過去100回の各数字の出現回数集計
+- 出現回数が多い数字10リスト
+- 出現回数が少ない数字10リスト
+
+#### 波の検出
+- 直近10回以内で3回以上出現した数字を波判定
+- これらの数字は選択確率が高くなる
+
+#### 復活候補の識別
+- 20回以上出現していない数字を復活候補として抽出するが、ただし、全体で出現回数が極端に少ない数字は除外する
+
+### 2. 推薦生成フェーズ
+
+#### ゾーン別選択
+```
+ゾーン1 (1-13):  3-4個選択 (安定構成)
+ゾーン2 (14-26): 残りを調整
+ゾーン3 (27-37): 2-3個選択 (まれに3個)
+```
+
+#### 数字の優先度
+- **+2.0点**: 波が来ている
+- **+1.0点**: 出現頻度が高い
+- **+1.0点**: 復活候補
+- **-0.5点**: 出現回数が極端に少ない
+- **-3.0点**: 直近3回以内に出現してる
+
+#### 制約バリデーション
+1. **ゾーン分布**: 各ゾーンが空でなく、推奨範囲内
+2. **奇数偶数比率**: 奇4:偶3 または 奇3:偶4
+3. **合計値**: 100 ≤ 合計 ≤ 160
+4. **近距離ペア**: 差が1~3の数字ペアが最低1組存在
 
 ### コンポーネント
 
 #### 1. RecommendationEngine
 ```go
 type RecommendationEngine struct {
-    config  RecommendationConfig  // 推薦設定
-    results [][]string           // 過去の抽選結果
-    history CombinationHistory   // 組み合わせ履歴
-    rng     *rand.Rand          // ランダムジェネレータ
+    config     RecommendationConfig  // 推薦設定
+    results    [][]string           // 過去の抽選結果
+    history    CombinationHistory   // 組み合わせ履歴
+    rng        *rand.Rand          // ランダム
+    statistics StatisticalAnalysis  // 統計分析結果
 }
 ```
 
-#### 2. NumberScore
+#### 2. StatisticalAnalysis
+```go
+type StatisticalAnalysis struct {
+    FrequentNumbers    []int        // 出現回数が多い数字
+    RareNumbers        []int        // 出現回数が少ない数字
+    HotNumbers         []int        // 波が来ている数字
+    RevivalCandidates  []int        // 復活候補
+    FrequencyMap       map[int]int  // 各数字の出現回数
+    LastAppearance     map[int]int  // 各数字の最終出現位置
+}
+```
+
+#### 3. NumberScore
 ```go
 type NumberScore struct {
     Number           int     // 数字（1-37）
@@ -25,29 +69,9 @@ type NumberScore struct {
     ConsecutiveScore float64 // 連続出現スコア
     PositionScore    float64 // 位置スコア
     TotalScore       float64 // 総合スコア
+    IsRecentlyDrawn  bool    // 直近で出現したか
 }
 ```
-
-## スコアリングについて
-
-### 1. 出現頻度スコア (FrequencyScore)
-過去に出現した回数で選択確率を評価する
-- **計算方法**: `出現回数 / 分析対象の回数`
-- **重み**: `FrequencyWeight` (デフォルト: 0.4)
-
-### 2. 最近の出現スコア (RecentScore)
-最近出現した数字を避ける傾向を作り出す
-- **計算方法**: 直近の出現からの経過回数に基づく
-- **重み**: `RecentWeight` (デフォルト: 0.3)
-
-### 3. 連続出現スコア (ConsecutiveScore)
-連続で出現している数字にボーナス/ペナルティを付与する
-- **計算方法**: 連続出現回数で調整
-- **重み**: `ConsecutiveWeight` (デフォルト: 0.2)
-
-### 4. 位置スコア (PositionScore)
-抽選時の位置による傾向を反映する
-- **計算方法**: 各位置での出現傾向を分析
 - **重み**: `PositionWeight` (デフォルト: 0.1)
 
 ### 総合スコア
@@ -128,19 +152,19 @@ if err != nil {
 }
 
 // 結果表示
-for i, rec := range recommendations {
-    fmt.Printf("推薦 %d: %v\n", i+1, rec)
-}
+formattedResult := engine.FormatRecommendations(recommendations)
+fmt.Println(formattedResult)
 ```
 
-### 実行結果例
+### コマンドラインから実行
+```bash
+# 推薦番号を生成
+make recommend
+
+# または直接実行
+go run ./cmd/recommendation
 ```
-推薦 1: 04 - 11 - 16 - 18 - 31 - 32 - 33
-推薦 2: 01 - 02 - 16 - 17 - 18 - 31 - 35
-推薦 3: 05 - 12 - 21 - 24 - 25 - 26 - 32
-推薦 4: 01 - 09 - 10 - 21 - 25 - 27 - 32
-推薦 5: 02 - 04 - 10 - 21 - 25 - 36 - 37
-```
+
 ## メモ
 
 ### 重要な設計判断
