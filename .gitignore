@@ -12,8 +12,10 @@ cache/
 *.test
 *.out
 
-# IDE設定（個人設定のみ）
 .vscode/launch.json
+
+# ジャンク置き場
+junk/
 
 # Ignore user-specific settings
 .vscode/settings.json

@@ -2,16 +2,12 @@
 
 ロト7あてる
 
-## Docker環境構築
+## Docker環境
 ```bash
-
-// Docker環境の起動
 docker compose up -d --build
 
-// コンテナアクセス
 docker compose exec dev sh
 
-// 環境の停止
 docker compose down
 
 ```
@@ -41,18 +37,16 @@ curl http://localhost:8080/api/results?count=10
 curl http://localhost:8080/api/results?count=100
 ```
 
-#### ヒートマップ分析
+#### ヒートマップ
 ```bash
-# 基本ヒートマップ（過去50回）
 curl http://localhost:8080/api/heatmap
 
-# 詳細ヒートマップ（過去100回）
 curl http://localhost:8080/api/heatmap?range=100
 ```
 
-#### 推薦番号生成
+#### 予測番号生成
 ```bash
-# 推薦番号の生成
+# 番号の生成
 curl http://localhost:8080/api/recommendation
 ```
 
@@ -64,23 +58,16 @@ curl http://localhost:8080/api/recommendation
 
 ### 1. ビルド
 ```bash
-# APIサーバーをビルド
 go build -o loto7-api ./cmd/api
-
-# Linux
-GOOS=linux GOARCH=arm64 go build -o loto7-api-linux ./cmd/api
-
-# Windows
-GOOS=windows GOARCH=arm64 go build -o loto7-api.exe ./cmd/api
 ```
 
 ### 3. サーバー配置
 ```bash
-# ディレクトリを作成
+# ディレクトリ作る
 mkdir -p /opt/loto7-api
 cd /opt/loto7-api
 
-# バイナリとキャッシュディレクトリをコピー
+# バイナリとキャッシュをコピー
 cp /path/to/loto7-api-linux ./loto7-api
 cp -r /path/to/cache ./cache
 
@@ -88,24 +75,8 @@ cp -r /path/to/cache ./cache
 chmod +x loto7-api
 ```
 
-### 4. APIサーバー起動
+### 4. systemd APIサーバー化
 
-#### フォアグラウンド
-```bash
-# 本番モードで起動
-GIN_MODE=release ./loto7-api
-```
-
-#### バックグラウンド
-```bash
-# （nohup
-nohup GIN_MODE=release ./loto7-api > loto7-api.log 2>&1 &
-
-# プロセスID
-ps aux | grep loto7-api
-```
-
-#### systemdサービスとして起動
 `/etc/systemd/system/loto7-api.service` を作成：
 
 ```ini
@@ -118,7 +89,7 @@ Type=simple
 User=loto7
 Group=loto7
 WorkingDirectory=/opt/loto7-api
-ExecStart=/opt/loto7-api/loto7-api
+ExecStart=/opt/loto7-api/loto7-api # Pathにあたる
 Environment=GIN_MODE=release
 Environment=PORT=8080
 Restart=always
@@ -144,63 +115,32 @@ sudo systemctl status loto7-api
 sudo journalctl -u loto7-api -f
 ```
 
-### 5. サーバー管理コマンド
+### 5. 鯖管
 
-#### サーバーの停止
+#### サーバー停止
 ```bash
-# プロセスIDを確認して終了
-pkill loto7-api
-
-# systemdの場合
 sudo systemctl stop loto7-api
 ```
 
 #### サーバー再起動
 ```bash
-# systemdの場合
 sudo systemctl restart loto7-api
 ```
 
 #### サーバーのアップデート
 ```bash
-# 最新コードをプル
-git pull origin main
+git pull origin master
 
-# 新しいバイナリをビルド
 go build -o loto7-api-new ./cmd/api
 
-# サービスを停止
 sudo systemctl stop loto7-api
 
-# バイナリを置き換え
-mv loto7-api-new loto7-api
+mv loto7-api-new /path/loto7-api
 
-# サービスを再起動
 sudo systemctl start loto7-api
 ```
 
-#### ログ監視
+#### ログ見る
 ```bash
-# nohupの場合
-tail -f loto7-api.log
-
-# systemdの場合
 sudo journalctl -u loto7-api -f
-```
-
-### 6. エンドポイント確認
-
-#### API エンドポイントテスト
-```bash
-# ヘルスチェック
-curl http://localhost:8080/health
-
-# 抽選結果取得
-curl http://localhost:8080/api/results?count=10
-
-# ヒートマップ
-curl http://localhost:8080/api/heatmap
-
-# 推薦番号生成
-curl http://localhost:8080/api/recommendation
 ```

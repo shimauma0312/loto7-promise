@@ -85,9 +85,9 @@ func main() {
 
 	// サーバー起動
 	port := ":8080"
-	log.Printf("🚀 Loto7 Promise API Server starting on port %s", port)
-	log.Printf("📋 Health check: http://localhost%s/health", port)
-	log.Printf("📊 API Documentation: http://localhost%s/", port)
+	log.Printf("Loto7 Promise API Server starting on port %s", port)
+	log.Printf("Health check: http://localhost%s/health", port)
+	log.Printf("API Documentation: http://localhost%s/", port)
 
 	if err := r.Run(port); err != nil {
 		log.Fatal("Failed to start server:", err)
@@ -156,7 +156,6 @@ func getResults(c *gin.Context) {
 
 // 指定回数分の過去のロト7抽選結果を取得する
 //
-// 機能概要:
 //   - 指定された回数分の過去の抽選結果を取得
 //   - キャッシュされたデータから結果を読み込み
 //   - 抽選回数、抽選日、当選番号を含むデータを返却

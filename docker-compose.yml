@@ -1,7 +1,6 @@
 services:
   #   docker-compose up -d --build
   #   docker-compose exec dev sh
-  #   その後コンテナ内で: go run ./cmd/result など
   dev:
     image: golang:1.25-alpine
     working_dir: /app
