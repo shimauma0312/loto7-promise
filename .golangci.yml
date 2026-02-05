@@ -1,0 +1,72 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck      # エラーチェック漏れを検出
+    - gosimple      # コードの簡略化を提案
+    - govet         # go vetの実行
+    - ineffassign   # 無駄な代入を検出
+    - staticcheck   # 静的解析
+    - unused        # 未使用のコードを検出
+    - gofmt         # フォーマットチェック
+    - goimports     # import順序チェック
+    - revive        # golintの代替
+    - misspell      # スペルミスを検出
+    - unconvert     # 不要な型変換を検出
+    - typecheck     # 型チェック
+    - goconst       # 繰り返し文字列を定数化提案
+    - godot         # コメントの末尾にピリオドがあるかチェック
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/shimauma0312/loto7-promise
+
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - "checkPrivateReceivers"
+          - "disableStutteringCheck"
+
+  misspell:
+    locale: US
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+issues:
+  exclude-rules:
+    # テストファイルでは一部のリンターを無効化
+    - path: _test\.go
+      linters:
+        - errcheck
+        - goconst
+
+    # main関数ではエラーチェックを緩和
+    - path: cmd/
+      linters:
+        - errcheck
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true

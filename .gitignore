@@ -1,5 +1,6 @@
 # キャッシュディレクトリ
 cache/
+!cache/loto7_results.json
 
 # Goビルド成果物
 *.exe
