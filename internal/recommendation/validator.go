@@ -1,5 +1,16 @@
 package recommendation
 
+const (
+	// バリデーション用の定数
+	TotalSumMin        = 100  // 合計値の最小値
+	TotalSumMax        = 160  // 合計値の最大値
+	AverageValueMin    = 16.0 // 平均値の最小値
+	AverageValueMax    = 23.0 // 平均値の最大値
+	SmoothnessMaxVar   = 50.0 // 滑らかさの最大分散
+	CloseNumberMinDiff = 1    // 近距離ペアの最小差
+	CloseNumberMaxDiff = 3    // 近距離ペアの最大差
+)
+
 // 組み合わせの妥当性検証を行うインターフェース
 type Validator interface {
 	Validate(combination []int) bool
@@ -93,7 +104,7 @@ func (v *TotalSumValidator) Validate(combination []int) bool {
 	for _, num := range combination {
 		sum += num
 	}
-	return sum >= 100 && sum <= 160
+	return sum >= TotalSumMin && sum <= TotalSumMax
 }
 
 // 平均値をバリデーションする実装
@@ -110,7 +121,7 @@ func (v *AverageValueValidator) Validate(combination []int) bool {
 	}
 	average := float64(sum) / float64(len(combination))
 	// 平均値が16~23の範囲内
-	return average >= 16.0 && average <= 23.0
+	return average >= AverageValueMin && average <= AverageValueMax
 }
 
 // 数字の並び滑らかさをバリデーションする実装
@@ -144,7 +155,7 @@ func (v *SmoothnessValidator) Validate(combination []int) bool {
 	stdDev := variance // 平方根は計算せず分散で判定
 
 	// 分散が大きすぎる（ジグザグが激しい）場合は却下
-	return stdDev <= 50.0
+	return stdDev <= SmoothnessMaxVar
 }
 
 // 近距離ペアの存在をバリデーションする実装
@@ -155,7 +166,7 @@ func (v *CloseNumberPairValidator) Validate(combination []int) bool {
 	for i := 0; i < len(combination); i++ {
 		for j := i + 1; j < len(combination); j++ {
 			diff := abs(combination[i] - combination[j])
-			if diff >= 1 && diff <= 3 {
+			if diff >= CloseNumberMinDiff && diff <= CloseNumberMaxDiff {
 				return true
 			}
 		}

@@ -5,6 +5,16 @@ import (
 	"sort"
 )
 
+const (
+	// ゾーン選択用の定数
+	Zone3SelectProbability = 0.2  // ゾーン3から3個選択する確率
+	MaxAttemptsFactor      = 10   // 最大試行回数の倍数
+	ScoreThreshold         = -0.5 // スコアの閾値
+	MinCandidates          = 3    // 最小候補数
+	BaseWeight             = 1.0  // ベースウェイト
+	MinWeight              = 0.1  // 最小ウェイト
+)
+
 // 候補選択を行うインターフェース
 type Selector interface {
 	SelectFromZone(min, max, count int, usedNumbers map[int]bool, scorer Scorer, stats StatisticalAnalysis, recentResults [][]string) []int
@@ -40,7 +50,7 @@ func (s *ZoneBasedSelector) GenerateCombination(scorer Scorer, stats Statistical
 
 	// ゾーン3 (27-37): 2-3個選択（まれに3個）
 	zone3Count := 2
-	if s.rng.Float64() < 0.2 { // 20%の確率で3個
+	if s.rng.Float64() < Zone3SelectProbability { // 20%の確率て3個
 		zone3Count = 3
 	}
 	zone3 := s.SelectFromZone(27, 37, zone3Count, usedNumbers, scorer, stats, recentResults)
@@ -77,7 +87,7 @@ func (s *ZoneBasedSelector) SelectFromZone(min, max, count int, usedNumbers map[
 	}
 
 	attempts := 0
-	maxAttempts := count * 10
+	maxAttempts := count * MaxAttemptsFactor
 
 	for len(selected) < count && attempts < maxAttempts {
 		attempts++
@@ -123,13 +133,13 @@ func (s *ZoneBasedSelector) getZoneCandidates(min, max int, usedNumbers map[int]
 		score := scorer.CalculatePriority(num, stats, recentResults)
 
 		// スコアが一定以上の数字を候補に
-		if score > -0.5 { // 閾値
+		if score > ScoreThreshold { // 闾値
 			candidates = append(candidates, num)
 		}
 	}
 
 	// 候補が少なすぎる場合は範囲内すべてを候補に
-	if len(candidates) < 3 {
+	if len(candidates) < MinCandidates {
 		candidates = []int{}
 		for num := min; num <= max; num++ {
 			if !usedNumbers[num] {
@@ -161,9 +171,9 @@ func (s *ZoneBasedSelector) weightedSelectFromCandidates(candidates []int, usedN
 		}
 
 		priority := scorer.CalculatePriority(num, stats, recentResults)
-		weight := priority + 1.0 // 最低限の重み
-		if weight < 0.1 {
-			weight = 0.1
+		weight := priority + BaseWeight // 最低限の重み
+		if weight < MinWeight {
+			weight = MinWeight
 		}
 
 		weighted = append(weighted, weightedNum{num: num, weight: weight})

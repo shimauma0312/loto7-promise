@@ -35,7 +35,11 @@ func (a *DefaultAnalyzer) Analyze(results [][]string, lookback int) StatisticalA
 	// 各数字の出現回数と最終出現位置を記録
 	for i := 0; i < lookback; i++ {
 		for _, numStr := range results[i] {
-			num, _ := strconv.Atoi(numStr)
+			num, err := strconv.Atoi(numStr)
+			if err != nil {
+				// 不正なフォーマットの場合はスキップ
+				continue
+			}
 			stats.FrequencyMap[num]++
 
 			// 最終出現位置を更新（最新の結果が0）
@@ -76,7 +80,11 @@ func (a *DefaultAnalyzer) Analyze(results [][]string, lookback int) StatisticalA
 	hotCount := make(map[int]int)
 	for i := 0; i < hotCheckRange; i++ {
 		for _, numStr := range results[i] {
-			num, _ := strconv.Atoi(numStr)
+			num, err := strconv.Atoi(numStr)
+			if err != nil {
+				// 不正なフォーマットの場合はスキップ
+				continue
+			}
 			hotCount[num]++
 		}
 	}
@@ -118,8 +126,12 @@ func (a *DefaultAnalyzer) BuildCombinationHistory(results [][]string) Combinatio
 		// 7個の数字から2個ずつの組み合わせを生成
 		for i := 0; i < len(numbers); i++ {
 			for j := i + 1; j < len(numbers); j++ {
-				num1, _ := strconv.Atoi(numbers[i])
-				num2, _ := strconv.Atoi(numbers[j])
+				num1, err1 := strconv.Atoi(numbers[i])
+				num2, err2 := strconv.Atoi(numbers[j])
+				if err1 != nil || err2 != nil {
+					// 不正なフォーマットの場合はスキップ
+					continue
+				}
 
 				// ペアキー作成（小さい数字,大きい数字の順）
 				var pairKey string

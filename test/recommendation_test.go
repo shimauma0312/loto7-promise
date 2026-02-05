@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/shimauma0312/loto7-promise/internal/recommendation"
@@ -379,7 +380,7 @@ func sumNumbers(combination []int) int {
 
 // ヘルパー関数: 組み合わせテスト名をフォーマット
 func formatCombinationTestName(index int, combination []int) string {
-	return ""
+	return fmt.Sprintf("組み合わせ%d: %v", index+1, combination)
 }
 
 // ベンチマークテスト: 推薦生成のパフォーマンス

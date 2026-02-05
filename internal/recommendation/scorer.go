@@ -2,6 +2,15 @@ package recommendation
 
 import "strconv"
 
+const (
+	// スコア計算用の重み
+	ScoreHotNumberBonus      = 2.0  // 波が来ている数字のボーナス
+	ScoreFrequentNumberBonus = 1.0  // 出現頻度が高い数字のボーナス
+	ScoreRevivalBonus        = 1.0  // 復活候補のボーナス
+	ScoreRarePenalty         = -0.5 // 出現頻度が少ない数字のペナルティ
+	ScoreRecentPenalty       = -3.0 // 直近で出た数字のペナルティ
+)
+
 // 数字の優先度計算を行うインターフェース
 type Scorer interface {
 	CalculatePriority(num int, stats StatisticalAnalysis, recentResults [][]string) float64
@@ -26,7 +35,7 @@ func (s *WeightedScorer) CalculatePriority(num int, stats StatisticalAnalysis, r
 	// 1. 波が来ている数字（直近10回で3回以上）は高評価
 	for _, hot := range stats.HotNumbers {
 		if hot == num {
-			score += 2.0
+			score += ScoreHotNumberBonus
 			break
 		}
 	}
@@ -34,7 +43,7 @@ func (s *WeightedScorer) CalculatePriority(num int, stats StatisticalAnalysis, r
 	// 2. 出現回数が多い数字は中程度評価
 	for _, freq := range stats.FrequentNumbers {
 		if freq == num {
-			score += 1.0
+			score += ScoreFrequentNumberBonus
 			break
 		}
 	}
@@ -42,7 +51,7 @@ func (s *WeightedScorer) CalculatePriority(num int, stats StatisticalAnalysis, r
 	// 3. 復活候補（20回以上未出現）は中程度評価
 	for _, revival := range stats.RevivalCandidates {
 		if revival == num {
-			score += 1.0
+			score += ScoreRevivalBonus
 			break
 		}
 	}
@@ -56,7 +65,7 @@ func (s *WeightedScorer) CalculatePriority(num int, stats StatisticalAnalysis, r
 		}
 	}
 	if isRare {
-		score -= 0.5
+		score += ScoreRarePenalty
 	}
 
 	// 5. 直近3回で出た数字は大幅減点
@@ -66,8 +75,13 @@ func (s *WeightedScorer) CalculatePriority(num int, stats StatisticalAnalysis, r
 	}
 	for i := 0; i < recentAvoid; i++ {
 		for _, numStr := range recentResults[i] {
-			if n, _ := strconv.Atoi(numStr); n == num {
-				score -= 3.0
+			n, err := strconv.Atoi(numStr)
+			if err != nil {
+				// 不正なフォーマットの場合はスキップ
+				continue
+			}
+			if n == num {
+				score += ScoreRecentPenalty
 				break
 			}
 		}

@@ -117,24 +117,43 @@ func TestDefaultAnalyzer_HotNumbers(t *testing.T) {
 func TestDefaultAnalyzer_RevivalCandidates(t *testing.T) {
 	analyzer := NewDefaultAnalyzer()
 
-	// 数字30は20回以上未出現（LastAppearance >= 20）
-	results := make([][]string, 25)
-	for i := 0; i < 25; i++ {
+	// 数字30が20回以上未出現になるようなテストデータを作成
+	// 最初の20回は数字30を含まない結果
+	results := make([][]string, 21)
+	for i := 0; i < 20; i++ {
 		results[i] = []string{"1", "2", "3", "4", "5", "6", "7"}
 	}
-	// 25回目に数字30を追加
-	results = append(results, []string{"30", "31", "32", "33", "34", "35", "36"})
+	// 21回目に数字30を含める（LastAppearance[30] = 20）
+	results[20] = []string{"30", "31", "32", "33", "34", "35", "36"}
 
-	stats := analyzer.Analyze(results, 26)
+	stats := analyzer.Analyze(results, 21)
 
-	// 注: 数字30は25回目に出現しているため、LastAppearance[30] = 0となり、
-	// 復活候補には含まれない。テストデータを修正する必要がある。
-	// ここでは、数字37（まったく出現していない）が復活候補になることを確認
-	if len(stats.RevivalCandidates) == 0 {
-		t.Log("復活候補が見つかりませんでした")
+	// 数字37は一度も出現していないため、復活候補に含まれるはず
+	// ただし、RareNumbersの上位5個に含まれている場合は除外される
+	found37 := false
+	for _, num := range stats.RevivalCandidates {
+		if num == 37 {
+			found37 = true
+			break
+		}
 	}
-	// 37が極端に少ない数字のリストに含まれていなければOK
+
+	// 37がRareNumbersの上位5個に含まれているかチェック
+	isRare37 := false
+	for i := 0; i < 5 && i < len(stats.RareNumbers); i++ {
+		if stats.RareNumbers[i] == 37 {
+			isRare37 = true
+			break
+		}
+	}
+
+	// 37がRareNumbersに含まれていなければ、RevivalCandidatesに含まれるべき
+	if !isRare37 && !found37 {
+		t.Errorf("数字37は復活候補に含まれるべきですが、含まれていません: %v", stats.RevivalCandidates)
+	}
+
 	t.Logf("RevivalCandidates: %v", stats.RevivalCandidates)
+	t.Logf("RareNumbers (top 5): %v", stats.RareNumbers[:5])
 }
 
 // TestDefaultAnalyzer_BuildCombinationHistory ペア履歴の構築をテスト

@@ -130,12 +130,12 @@ func TestTotalSumValidator_ValidCombination(t *testing.T) {
 	}{
 		{
 			name:        "合計100（下限）",
-			combination: []int{1, 2, 3, 4, 20, 30, 40}, // 合計100
+			combination: []int{1, 2, 3, 4, 20, 33, 37}, // 合計100
 			want:        true,
 		},
 		{
 			name:        "合計160（上限）",
-			combination: []int{10, 15, 20, 25, 30, 30, 30}, // 合計160
+			combination: []int{15, 19, 24, 25, 26, 27, 24}, // 合計160
 			want:        true,
 		},
 		{
@@ -145,7 +145,7 @@ func TestTotalSumValidator_ValidCombination(t *testing.T) {
 		},
 		{
 			name:        "合計99（下限未満）",
-			combination: []int{1, 2, 3, 4, 5, 6, 78}, // 合計99
+			combination: []int{1, 2, 3, 4, 20, 32, 37}, // 合計99
 			want:        false,
 		},
 		{
