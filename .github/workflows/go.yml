@@ -1,28 +1,96 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
-name: Go
+# Loto7 Recommendation System CI
+name: CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
 
 jobs:
-
-  build:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.22.2'
+        go-version: '1.23'
+        cache: true
 
-    - name: Build
-      run: go build -v ./...
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --timeout=5m
 
-    - name: Test
-      run: go test -v ./...
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Run tests
+      run: go test -v -race -coverprofile=coverage.out ./...
+
+    - name: Coverage report
+      run: go tool cover -func=coverage.out
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: always()
+      with:
+        file: ./coverage.out
+        flags: unittests
+        fail_ci_if_error: false
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux, darwin, windows]
+        arch: [amd64, arm64]
+        exclude:
+          - os: windows
+            arch: arm64
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+
+    - name: Build cmd/api
+      run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -v -o bin/api-${{ matrix.os }}-${{ matrix.arch }} ./cmd/api
+
+    - name: Build cmd/recommendation
+      run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -v -o bin/recommendation-${{ matrix.os }}-${{ matrix.arch }} ./cmd/recommendation
+
+    - name: Build cmd/heatmap
+      run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -v -o bin/heatmap-${{ matrix.os }}-${{ matrix.arch }} ./cmd/heatmap
+
+    - name: Build cmd/result
+      run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -v -o bin/result-${{ matrix.os }}-${{ matrix.arch }} ./cmd/result
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries-${{ matrix.os }}-${{ matrix.arch }}
+        path: bin/*
