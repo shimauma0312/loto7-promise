@@ -62,7 +62,7 @@ func TestIntegration(t *testing.T) {
 		})
 
 		t.Run("推薦機能", func(t *testing.T) {
-			TestRecommendationDefaultConfig(t)
+			TestRecommendationDefaultConfig_StandardValues(t)
 		})
 
 		t.Log("全機能の基本動作を確認しました")
