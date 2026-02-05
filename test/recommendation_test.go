@@ -62,7 +62,7 @@ func TestLoadData_Success(t *testing.T) {
 	config := recommendation.DefaultConfig()
 	engine := recommendation.NewRecommendationEngine(config)
 
-	err := engine.LoadData(50)
+TestRecommendationDefaultConfig_StandardValues(t)
 	if err != nil {
 		t.Fatalf("LoadData failed: %v", err)
 	}
