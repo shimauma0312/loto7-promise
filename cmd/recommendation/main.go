@@ -10,12 +10,10 @@ import (
 
 func main() {
 	var (
-		count            = flag.Int("count", 100, "分析する過去の抽選回数")
-		maxRecommend     = flag.Int("max", 5, "生成する推薦組み合わせの数")
-		recentAvoid      = flag.Int("avoid", 3, "直近で避ける抽選回数")
-		consecutiveBoost = flag.Int("boost", 3, "連続出現ブースト判定回数")
-		showScores       = flag.Bool("scores", false, "各数字のスコア詳細を表示")
-		help             = flag.Bool("help", false, "ヘルプを表示")
+		count        = flag.Int("count", 100, "分析する過去の抽選回数")
+		maxRecommend = flag.Int("max", 5, "生成する推薦組み合わせの数")
+		showScores   = flag.Bool("scores", false, "各数字のスコア詳細を表示")
+		help         = flag.Bool("help", false, "ヘルプを表示")
 	)
 
 	flag.Parse()
@@ -28,8 +26,6 @@ func main() {
 	// 推薦エンジンの設定
 	config := recommendation.DefaultConfig()
 	config.MaxRecommendations = *maxRecommend
-	config.RecentAvoidCount = *recentAvoid
-	config.ConsecutiveBoost = *consecutiveBoost
 
 	// エンジンを作成
 	engine := recommendation.NewRecommendationEngine(config)
@@ -71,8 +67,6 @@ func showHelp() {
 	fmt.Println("オプション:")
 	fmt.Println("  -count int      分析する過去の抽選回数 (デフォルト: 100)")
 	fmt.Println("  -max int        生成する推薦組み合わせの数 (デフォルト: 5)")
-	fmt.Println("  -avoid int      直近で避ける抽選回数 (デフォルト: 3)")
-	fmt.Println("  -boost int      連続出現ブースト判定回数 (デフォルト: 3)")
 	fmt.Println("  -scores         各数字のスコア詳細を表示")
 	fmt.Println("  -help           このヘルプを表示")
 	fmt.Println()

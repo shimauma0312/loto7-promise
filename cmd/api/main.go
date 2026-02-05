@@ -569,12 +569,6 @@ func getRecommendations(c *gin.Context) {
 		}
 	}
 
-	if avoidStr := c.Query("avoid"); avoidStr != "" {
-		if avoid, err := strconv.Atoi(avoidStr); err == nil && avoid >= 0 && avoid <= 10 {
-			config.RecentAvoidCount = avoid
-		}
-	}
-
 	generateRecommendations(c, config)
 }
 
@@ -624,9 +618,6 @@ func getRecommendationsPost(c *gin.Context) {
 		}
 		if reqConfig.HistoryLookback <= 0 || reqConfig.HistoryLookback > 1000 {
 			reqConfig.HistoryLookback = 100
-		}
-		if reqConfig.RecentAvoidCount < 0 || reqConfig.RecentAvoidCount > 10 {
-			reqConfig.RecentAvoidCount = 3
 		}
 	}
 
@@ -713,13 +704,9 @@ func generateRecommendations(c *gin.Context, config recommendation.Recommendatio
 		},
 		Config: api.ConfigInfo{
 			MaxRecommendations: config.MaxRecommendations,
-			RecentAvoidCount:   config.RecentAvoidCount,
-			ConsecutiveBoost:   config.ConsecutiveBoost,
 			HistoryLookback:    config.HistoryLookback,
 			FrequencyWeight:    config.FrequencyWeight,
 			RecentWeight:       config.RecentWeight,
-			ConsecutiveWeight:  config.ConsecutiveWeight,
-			PositionWeight:     config.PositionWeight,
 		},
 	}
 

@@ -1,5 +1,10 @@
 package recommendation
 
+import (
+	"sort"
+	"strconv"
+)
+
 const (
 	// バリデーション用の定数
 	TotalSumMin        = 100  // 合計値の最小値
@@ -180,4 +185,93 @@ func abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+// 過去の組み合わせと重複していないかバリデーションする実装
+type PastCombinationValidator struct {
+	recentResults [][]string
+	checkCount    int // 直近何回分をチェックするか
+}
+
+// 過去組み合わせバリデータを作成する
+func NewPastCombinationValidator(recentResults [][]string, checkCount int) *PastCombinationValidator {
+	return &PastCombinationValidator{
+		recentResults: recentResults,
+		checkCount:    checkCount,
+	}
+}
+
+// 過去の組み合わせと重複していないかチェックする
+func (v *PastCombinationValidator) Validate(combination []int) bool {
+	// 組み合わせをソート
+	sortedCombination := make([]int, len(combination))
+	copy(sortedCombination, combination)
+	sort.Ints(sortedCombination)
+
+	// 過去の抽選結果から、推薦番号の中の任意の1つが出現した回を探す
+	matchingDraws := [][]int{}
+	checkRange := v.checkCount
+	if checkRange > len(v.recentResults) {
+		checkRange = len(v.recentResults)
+	}
+
+	for i := 0; i < checkRange; i++ {
+		// その回の数字を取得
+		drawNumbers := make([]int, 0, len(v.recentResults[i]))
+		for _, numStr := range v.recentResults[i] {
+			num, err := strconv.Atoi(numStr)
+			if err != nil {
+				continue
+			}
+			drawNumbers = append(drawNumbers, num)
+		}
+
+		// 推薦番号のいずれかの数字が含まれているかチェック
+		hasMatch := false
+		for _, recNum := range sortedCombination {
+			for _, drawNum := range drawNumbers {
+				if recNum == drawNum {
+					hasMatch = true
+					break
+				}
+			}
+			if hasMatch {
+				break
+			}
+		}
+
+		// マッチした場合、その回の数字を記録
+		if hasMatch {
+			matchingDraws = append(matchingDraws, drawNumbers)
+		}
+
+		// 直近2回分を確認したら終了
+		if len(matchingDraws) >= 2 {
+			break
+		}
+	}
+
+	// マッチした過去の抽選結果と、推薦組み合わせが同じでないかチェック
+	for _, pastDraw := range matchingDraws {
+		sortedPastDraw := make([]int, len(pastDraw))
+		copy(sortedPastDraw, pastDraw)
+		sort.Ints(sortedPastDraw)
+
+		// 完全一致チェック
+		if len(sortedCombination) == len(sortedPastDraw) {
+			isIdentical := true
+			for j := 0; j < len(sortedCombination); j++ {
+				if sortedCombination[j] != sortedPastDraw[j] {
+					isIdentical = false
+					break
+				}
+			}
+			// 同じ組み合わせが過去に存在した場合は却下
+			if isIdentical {
+				return false
+			}
+		}
+	}
+
+	return true
 }
