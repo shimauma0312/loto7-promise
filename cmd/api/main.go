@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shimauma0312/loto7-promise/internal/api"
 	"github.com/shimauma0312/loto7-promise/internal/heatmap"
+	"github.com/shimauma0312/loto7-promise/internal/random"
 	"github.com/shimauma0312/loto7-promise/internal/recommendation"
 	"github.com/shimauma0312/loto7-promise/internal/result"
 )
@@ -61,6 +62,9 @@ func main() {
 		// 推薦機能
 		v1.GET("/recommendations", getRecommendations)
 		v1.POST("/recommendations", getRecommendationsPost)
+
+		// ランダム生成機能
+		v1.GET("/random", getRandom)
 	}
 
 	// ルート
@@ -76,6 +80,7 @@ func main() {
 					"heatmap":         "/api/v1/heatmap",
 					"heatmap_table":   "/api/v1/heatmap/table",
 					"recommendations": "/api/v1/recommendations",
+					"random":          "/api/v1/random",
 				},
 				"documentation": "https://github.com/shimauma0312/loto7-promise",
 			},
@@ -127,6 +132,7 @@ func healthCheck(c *gin.Context) {
 			"result_cache":   "operational",
 			"heatmap_engine": "operational",
 			"recommendation": "operational",
+			"random":         "operational",
 		},
 	}
 
@@ -847,4 +853,114 @@ func formatNumberList(numbers []int) string {
 	}
 
 	return "[" + strings.Join(strNumbers, ", ") + "]"
+}
+
+// ランダム性を重視した推薦番号を生成する
+//
+// 機能:
+//   - 各数字位置で過去に出現した範囲内からランダムに数字を選択
+//   - 未出現の数字を自動的に除外
+//   - よりロト7の本来のランダム性を再現
+//
+// リクエスト:
+//   - HTTP Method: GET
+//   - Path: /api/v1/random
+//   - Parameters:
+//   - count (query): 生成する組み合わせ数 (1-10、デフォルト: 5)
+//   - history (query): 分析する過去の抽選回数 (1-1000、デフォルト: 100)
+//
+// レスポンス:
+//   - Status: 200 OK
+//   - Body: RandomResponse形式のJSON
+//   - combinations: RandomSet配列（各組み合わせ）
+//   - analysis_info: 分析情報
+//   - data_source: データソース
+//   - history_count: 分析した履歴数
+//   - timestamp: 生成時刻
+//
+// エラーレスポンス:
+//   - 400 Bad Request: パラメータが範囲外
+//   - 500 Internal Server Error: データ読み込みまたは生成に失敗
+func getRandom(c *gin.Context) {
+	// デフォルト値
+	count := 5
+	historyCount := 100
+
+	// クエリパラメータから設定を取得
+	if countStr := c.Query("count"); countStr != "" {
+		if parsedCount, err := strconv.Atoi(countStr); err == nil && parsedCount > 0 && parsedCount <= 10 {
+			count = parsedCount
+		} else {
+			response := api.ErrorResponse(
+				"INVALID_COUNT",
+				"生成数は1-10の範囲で指定してください",
+				"count parameter must be between 1 and 10",
+			)
+			c.JSON(http.StatusBadRequest, response)
+			return
+		}
+	}
+
+	if historyStr := c.Query("history"); historyStr != "" {
+		if parsedHistory, err := strconv.Atoi(historyStr); err == nil && parsedHistory > 0 && parsedHistory <= 1000 {
+			historyCount = parsedHistory
+		} else {
+			response := api.ErrorResponse(
+				"INVALID_HISTORY",
+				"履歴数は1-1000の範囲で指定してください",
+				"history parameter must be between 1 and 1000",
+			)
+			c.JSON(http.StatusBadRequest, response)
+			return
+		}
+	}
+
+	// ランダムエンジンを作成
+	engine := random.NewRandomEngine()
+
+	// データを読み込み
+	err := engine.LoadData(historyCount)
+	if err != nil {
+		response := api.ErrorResponse(
+			"DATA_LOAD_ERROR",
+			"ランダム生成データの読み込みに失敗しました",
+			err.Error(),
+		)
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+
+	// ランダム組み合わせを生成
+	combinations, err := engine.GenerateMultipleRandomCombinations(count)
+	if err != nil {
+		response := api.ErrorResponse(
+			"RANDOM_GENERATION_ERROR",
+			"ランダム組み合わせの生成に失敗しました",
+			err.Error(),
+		)
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+
+	// レスポンス用にデータを変換
+	randomSets := make([]api.RecommendationSet, len(combinations))
+	for i, combo := range combinations {
+		randomSets[i] = api.RecommendationSet{
+			ID:      i + 1,
+			Numbers: combo,
+		}
+	}
+
+	data := api.RecommendationResponse{
+		Recommendations: randomSets,
+		AnalysisInfo: api.AnalysisInfo{
+			DataSource:   "cache",
+			HistoryCount: historyCount,
+			GeneratedAt:  time.Now(),
+		},
+		Config: nil, // ランダム生成なので設定なし
+	}
+
+	response := api.SuccessResponse("ランダム組み合わせを生成しました", data)
+	c.JSON(http.StatusOK, response)
 }
