@@ -3,12 +3,15 @@ package recommendation
 import "strconv"
 
 const (
-	// スコア計算用の重み
-	ScoreHotNumberBonus      = 2.0  // 波が来ている数字のボーナス
-	ScoreFrequentNumberBonus = 1.0  // 出現頻度が高い数字のボーナス
-	ScoreRevivalBonus        = 1.0  // 復活候補のボーナス
-	ScoreRarePenalty         = -0.5 // 出現頻度が少ない数字のペナルティ
-	ScoreRecentPenalty       = -3.0 // 直近で出た数字のペナルティ
+	// スコア計算用の定数
+	ScoreRecent1Penalty      = -100.0  // 直近1回の抽選結果のペナルティ（限りなく低い）
+	ScoreRecent2Penalty      = -10.0   // 直近2回までのペナルティ（それなりに低い）
+	ScoreWithin50Boost       = 0.5     // 直近3回を除き、50回以内の出現ブースト（出現回数分）
+	ScoreLowFrequencyPenalty = -1.0    // 直近100回で5回未満のペナルティ
+	ScoreNoAppearancePenalty = -1000.0 // 直近100回で未出現のペナルティ（出現率0）
+	Recent50CheckRange       = 50      // 50回以内チェック範囲
+	RecentAvoidRange         = 3       // 直近3回は除く
+	LowFrequencyThreshold    = 5       // 低頻度判定閾値
 )
 
 // 数字の優先度計算を行うインターフェース
@@ -32,60 +35,66 @@ func NewWeightedScorer(config RecommendationConfig) *WeightedScorer {
 func (s *WeightedScorer) CalculatePriority(num int, stats StatisticalAnalysis, recentResults [][]string) float64 {
 	score := 0.0
 
-	// 1. 波が来ている数字（直近10回で3回以上）は高評価
-	for _, hot := range stats.HotNumbers {
-		if hot == num {
-			score += ScoreHotNumberBonus
-			break
-		}
-	}
-
-	// 2. 出現回数が多い数字は中程度評価
-	for _, freq := range stats.FrequentNumbers {
-		if freq == num {
-			score += ScoreFrequentNumberBonus
-			break
-		}
-	}
-
-	// 3. 復活候補（20回以上未出現）は中程度評価
-	for _, revival := range stats.RevivalCandidates {
-		if revival == num {
-			score += ScoreRevivalBonus
-			break
-		}
-	}
-
-	// 4. 出現回数が極端に少ない数字は減点
-	isRare := false
-	for _, rare := range stats.RareNumbers {
-		if rare == num {
-			isRare = true
-			break
-		}
-	}
-	if isRare {
-		score += ScoreRarePenalty
-	}
-
-	// 5. 直近3回で出た数字は大幅減点
-	recentAvoid := s.config.RecentAvoidCount
-	if recentAvoid > len(recentResults) {
-		recentAvoid = len(recentResults)
-	}
-	for i := 0; i < recentAvoid; i++ {
-		for _, numStr := range recentResults[i] {
+	// 1. 直近1回の抽選結果での数字は、出現率を限りなく低いレベルで下げる
+	if len(recentResults) > 0 {
+		for _, numStr := range recentResults[0] {
 			n, err := strconv.Atoi(numStr)
 			if err != nil {
-				// 不正なフォーマットの場合はスキップ
 				continue
 			}
 			if n == num {
-				score += ScoreRecentPenalty
+				return ScoreRecent1Penalty // 即座に大幅減点で返す
+			}
+		}
+	}
+
+	// 2. 直近2回目の抽選結果での数字は、出現率をそれなりに下げる
+	if len(recentResults) > 1 {
+		// 直近2回目（インデックス1）をチェック
+		for _, numStr := range recentResults[1] {
+			n, err := strconv.Atoi(numStr)
+			if err != nil {
+				continue
+			}
+			if n == num {
+				score += ScoreRecent2Penalty
 				break
 			}
 		}
 	}
+
+	// 3. 直近100回で出現していない数字は、出現率が0になる
+	freq, exists := stats.FrequencyMap[num]
+	if !exists || freq == 0 {
+		return ScoreNoAppearancePenalty
+	}
+
+	// 4. 直近100回で出現回数が5回未満の数字は、少しばかし出現率をマイナスする
+	if freq < LowFrequencyThreshold {
+		score += ScoreLowFrequencyPenalty
+	}
+
+	// 5. 直近3回は除き、50回以内に出現した数字は、出現回数分ブーストされる
+	// 直近3回を除いた範囲（3回目から50回目）をチェック
+	checkStart := RecentAvoidRange
+	checkEnd := Recent50CheckRange
+	if checkEnd > len(recentResults) {
+		checkEnd = len(recentResults)
+	}
+
+	within50Count := 0
+	for i := checkStart; i < checkEnd; i++ {
+		for _, numStr := range recentResults[i] {
+			n, err := strconv.Atoi(numStr)
+			if err != nil {
+				continue
+			}
+			if n == num {
+				within50Count++
+			}
+		}
+	}
+	score += float64(within50Count) * ScoreWithin50Boost
 
 	return score
 }

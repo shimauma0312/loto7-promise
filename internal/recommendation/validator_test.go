@@ -349,3 +349,45 @@ func TestCompositeValidator_AllValidators(t *testing.T) {
 		})
 	}
 }
+
+// TestPastCombinationValidator_ValidCombination 過去の組み合わせチェックをテスト
+func TestPastCombinationValidator_ValidCombination(t *testing.T) {
+	recentResults := [][]string{
+		{"1", "2", "3", "4", "5", "6", "7"},        // 直近1回目
+		{"8", "9", "10", "11", "12", "13", "14"},   // 直近2回目
+		{"15", "16", "17", "18", "19", "20", "21"}, // 直近3回目
+	}
+
+	validator := NewPastCombinationValidator(recentResults, 100)
+
+	tests := []struct {
+		name        string
+		combination []int
+		want        bool
+	}{
+		{
+			name:        "過去と完全に同じ組み合わせ",
+			combination: []int{1, 2, 3, 4, 5, 6, 7},
+			want:        false, // 同じ組み合わせは却下
+		},
+		{
+			name:        "過去と異なる組み合わせ",
+			combination: []int{1, 2, 3, 22, 23, 30, 35},
+			want:        true,
+		},
+		{
+			name:        "過去に含まれない数字のみ",
+			combination: []int{22, 23, 24, 25, 26, 30, 35},
+			want:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := validator.Validate(tt.combination)
+			if got != tt.want {
+				t.Errorf("Validate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

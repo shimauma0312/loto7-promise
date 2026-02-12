@@ -12,6 +12,66 @@ docker compose down
 
 ```
 
+## コマンドラインツール
+
+### ランダム番号生成
+各数字位置で過去に出現した範囲内から**重み付き乱択**で数字を選択します。
+出現頻度の高い数字ほど選ばれやすくなり、実際のロト7の傾向を再現します。
+
+**特徴:**
+- 各位置での過去の出現頻度を分析
+- 頻出数字に高い重みを付与（例: 1番目の位置では1-5が選ばれやすい）
+- **直近ペナルティ**: 直近1回、2回で出現した数字は選ばれにくくなる
+  - 直近1回目: 重み×0.05（大幅に選ばれにくい）
+  - 直近2回目: 重み×0.3（選ばれにくい）
+- 未出現の数字は自動的に除外
+- より本来のロト7のランダム性を再現
+
+```bash
+# 基本的な使い方（過去100回分を分析、5組生成）
+go run cmd/random/main.go
+
+# 過去150回分を分析、3組生成
+go run cmd/random/main.go -history 150 -count 3
+
+# 各位置の出現範囲と上位頻出数字を表示
+go run cmd/random/main.go -verbose
+
+# ヘルプを表示
+go run cmd/random/main.go -help
+```
+
+### 統計ベース推薦番号生成
+統計分析に基づいて番号を推薦します。
+
+```bash
+# 基本的な使い方
+go run cmd/recommendation/main.go
+
+# 過去150回分を分析、3組生成
+go run cmd/recommendation/main.go -history 150 -count 3
+```
+
+### 1等当選シミュレーター
+ユーザーの選択数字で1等が当選するまでのシミュレーションを行います。
+
+```bash
+# 基本的な使い方（自動生成された数字で1回シミュレーション）
+go run cmd/simulation/main.go
+
+# 指定した数字で1回シミュレーション
+go run cmd/simulation/main.go -numbers 1,5,10,15,20,25,30
+
+# 10回シミュレーションして統計を取る
+go run cmd/simulation/main.go -simulations 10
+
+# 指定した数字で10回シミュレーション
+go run cmd/simulation/main.go -numbers 1,5,10,15,20,25,30 -simulations 10
+
+# ヘルプを表示
+go run cmd/simulation/main.go -help
+```
+
 ## APIサーバー構築呼び出し
 
 ### 1. APIサーバー起動
@@ -48,6 +108,48 @@ curl http://localhost:8080/api/heatmap?range=100
 ```bash
 # 番号の生成
 curl http://localhost:8080/api/recommendation
+```
+
+#### ランダム番号生成
+```bash
+# 重み付き乱択による番号生成
+curl http://localhost:8080/api/v1/random
+
+# 過去の抽選データ範囲と生成数を指定
+curl "http://localhost:8080/api/v1/random?history=150&count=3"
+```
+**注:** 各位置での出現頻度に応じた重み付きランダム選択を使用
+
+#### 1等当選シミュレーション
+```bash
+# 自動生成された数字で1回シミュレーション
+curl -X POST http://localhost:8080/api/v1/simulation \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# 指定した数字で1回シミュレーション
+curl -X POST http://localhost:8080/api/v1/simulation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_numbers": [1, 5, 10, 15, 20, 25, 30]
+  }'
+
+# 10回シミュレーションして統計を取る
+curl -X POST http://localhost:8080/api/v1/simulation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_numbers": [1, 5, 10, 15, 20, 25, 30],
+    "simulation_count": 10
+  }'
+
+# 詳細設定
+curl -X POST http://localhost:8080/api/v1/simulation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_numbers": [1, 5, 10, 15, 20, 25, 30],
+    "simulation_count": 5,
+    "history_count": 150
+  }'
 ```
 
 ## APIデプロイ

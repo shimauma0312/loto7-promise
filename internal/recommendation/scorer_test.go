@@ -8,60 +8,61 @@ func TestWeightedScorer_CalculatePriority(t *testing.T) {
 	scorer := NewWeightedScorer(config)
 
 	stats := StatisticalAnalysis{
-		FrequentNumbers:   []int{1, 5, 10, 15, 20},
-		RareNumbers:       []int{3, 7, 33, 34, 37},
-		HotNumbers:        []int{5, 10, 20},
-		RevivalCandidates: []int{25, 30},
-		FrequencyMap:      map[int]int{1: 20, 5: 18, 10: 17, 15: 16, 20: 15},
-		LastAppearance:    map[int]int{1: 0, 5: 1, 10: 2},
+		FrequencyMap: map[int]int{
+			1: 8, 5: 18, 10: 17, 15: 16, 20: 15, // 5回以上
+			3: 3, 7: 2, 33: 4, 34: 2, 37: 1, // 5回未満
+			25: 10, 30: 12,
+		},
 	}
 
 	recentResults := [][]string{
-		{"1", "2", "3", "4", "6", "7", "8"},
-		{"9", "11", "12", "13", "14", "16", "17"},
-		{"18", "19", "21", "22", "23", "24", "26"},
+		{"1", "2", "3", "4", "6", "7", "8"},        // 直近1回目
+		{"9", "11", "12", "13", "14", "16", "17"},  // 直近2回目
+		{"18", "19", "21", "22", "23", "24", "26"}, // 直近3回目
+		{"5", "10", "15", "20", "25", "30", "35"},  // 4回目（50回以内カウント対象）
+		{"5", "10", "27", "28", "29", "31", "36"},  // 5回目（50回以内カウント対象）
 	}
 
 	tests := []struct {
 		name         string
 		num          int
-		wantPositive bool // スコアがプラスであることを期待
-		wantNegative bool // スコアがマイナスであることを期待
+		wantPositive bool
+		wantNegative bool
 	}{
 		{
-			name:         "波が来ている数字（+2.0）",
-			num:          5,
-			wantPositive: true,  // HotNumbersに含まれるので+2.0だが、直近に出現していれば-3.0
-			wantNegative: false, // このテストでは直近に出現していない前提に修正
-		},
-		{
-			name:         "出現頻度が高い数字（+1.0）",
+			name:         "直近1回で出現した数字（限りなく低い）",
 			num:          1,
-			wantPositive: false, // 直近に出現で-3.0
+			wantPositive: false,
 			wantNegative: true,
 		},
 		{
-			name:         "復活候補（+1.0）",
-			num:          25,
+			name:         "直近2回で出現した数字（それなりに低い）",
+			num:          9,
+			wantPositive: false,
+			wantNegative: true,
+		},
+		{
+			name:         "50回以内に複数回出現した数字（ブースト）",
+			num:          5,
 			wantPositive: true,
 			wantNegative: false,
 		},
 		{
-			name:         "出現回数が少ない数字（-0.5）",
+			name:         "5回未満の出現回数（低頻度ペナルティ）",
 			num:          33,
 			wantPositive: false,
 			wantNegative: true,
 		},
 		{
-			name:         "直近3回で出現（-3.0）",
-			num:          2,
+			name:         "出現していない数字（出現率0）",
+			num:          36,
 			wantPositive: false,
 			wantNegative: true,
 		},
 		{
-			name:         "普通の数字",
-			num:          22,
-			wantPositive: false, // 0.0付近
+			name:         "普通の数字（5回以上、直近には出ていない）",
+			num:          25,
+			wantPositive: true, // 4回目に出現しているのでブースト
 			wantNegative: false,
 		},
 	}
@@ -80,141 +81,103 @@ func TestWeightedScorer_CalculatePriority(t *testing.T) {
 	}
 }
 
-// TestWeightedScorer_HotNumberBonus 波が来ている数字のボーナスをテスト
-func TestWeightedScorer_HotNumberBonus(t *testing.T) {
+// TestWeightedScorer_Recent1Penalty 直近1回のペナルティをテスト
+func TestWeightedScorer_Recent1Penalty(t *testing.T) {
 	config := DefaultConfig()
 	scorer := NewWeightedScorer(config)
 
 	stats := StatisticalAnalysis{
-		HotNumbers: []int{10, 20, 30},
+		FrequencyMap: map[int]int{1: 10, 2: 8},
 	}
 
-	recentResults := [][]string{} // 直近出現なし
-
-	tests := []struct {
-		name      string
-		num       int
-		wantBonus bool
-	}{
-		{
-			name:      "波が来ている数字",
-			num:       10,
-			wantBonus: true,
-		},
-		{
-			name:      "波が来ていない数字",
-			num:       15,
-			wantBonus: false,
-		},
+	recentResults := [][]string{
+		{"1", "2", "3", "4", "5", "6", "7"}, // 直近1回目
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			score := scorer.CalculatePriority(tt.num, stats, recentResults)
-
-			if tt.wantBonus && score < 2.0 {
-				t.Errorf("CalculatePriority(%d) = %v, want >= 2.0", tt.num, score)
-			}
-			if !tt.wantBonus && score >= 2.0 {
-				t.Errorf("CalculatePriority(%d) = %v, want < 2.0", tt.num, score)
-			}
-		})
+	score1 := scorer.CalculatePriority(1, stats, recentResults)
+	if score1 != ScoreRecent1Penalty {
+		t.Errorf("直近1回の数字のスコア = %v, want %v", score1, ScoreRecent1Penalty)
 	}
 }
 
-// TestWeightedScorer_RecentAvoidPenalty 直近出現のペナルティをテスト
-func TestWeightedScorer_RecentAvoidPenalty(t *testing.T) {
+// TestWeightedScorer_Recent2Penalty 直近2回のペナルティをテスト
+func TestWeightedScorer_Recent2Penalty(t *testing.T) {
 	config := DefaultConfig()
-	config.RecentAvoidCount = 3
 	scorer := NewWeightedScorer(config)
 
-	stats := StatisticalAnalysis{}
+	stats := StatisticalAnalysis{
+		FrequencyMap: map[int]int{8: 10},
+	}
+
+	recentResults := [][]string{
+		{"1", "2", "3", "4", "5", "6", "7"},      // 直近1回目
+		{"8", "9", "10", "11", "12", "13", "14"}, // 直近2回目
+	}
+
+	score := scorer.CalculatePriority(8, stats, recentResults)
+	if score >= 0 {
+		t.Errorf("直近2回の数字のスコア = %v, want negative", score)
+	}
+}
+
+// TestWeightedScorer_Within50Boost 50回以内ブーストをテスト
+func TestWeightedScorer_Within50Boost(t *testing.T) {
+	config := DefaultConfig()
+	scorer := NewWeightedScorer(config)
+
+	stats := StatisticalAnalysis{
+		FrequencyMap: map[int]int{5: 10},
+	}
+
+	recentResults := [][]string{
+		{"1", "2", "3", "4", "6", "7", "8"},        // 直近1回目
+		{"9", "10", "11", "12", "13", "14", "15"},  // 直近2回目
+		{"16", "17", "18", "19", "20", "21", "22"}, // 直近3回目
+		{"5", "23", "24", "25", "26", "27", "28"},  // 4回目（ブースト対象）
+		{"5", "29", "30", "31", "32", "33", "34"},  // 5回目（ブースト対象）
+	}
+
+	score := scorer.CalculatePriority(5, stats, recentResults)
+	expectedBoost := 2 * ScoreWithin50Boost // 2回出現
+	if score < expectedBoost {
+		t.Errorf("50回以内に2回出現した数字のスコア = %v, want >= %v", score, expectedBoost)
+	}
+}
+
+// TestWeightedScorer_NoAppearancePenalty 未出現ペナルティをテスト
+func TestWeightedScorer_NoAppearancePenalty(t *testing.T) {
+	config := DefaultConfig()
+	scorer := NewWeightedScorer(config)
+
+	stats := StatisticalAnalysis{
+		FrequencyMap: map[int]int{}, // 出現なし
+	}
 
 	recentResults := [][]string{
 		{"1", "2", "3", "4", "5", "6", "7"},
-		{"8", "9", "10", "11", "12", "13", "14"},
-		{"15", "16", "17", "18", "19", "20", "21"},
 	}
 
-	tests := []struct {
-		name        string
-		num         int
-		wantPenalty bool
-	}{
-		{
-			name:        "直近1回目に出現",
-			num:         1,
-			wantPenalty: true,
-		},
-		{
-			name:        "直近2回目に出現",
-			num:         10,
-			wantPenalty: true,
-		},
-		{
-			name:        "直近3回目に出現",
-			num:         20,
-			wantPenalty: true,
-		},
-		{
-			name:        "直近3回に未出現",
-			num:         25,
-			wantPenalty: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			score := scorer.CalculatePriority(tt.num, stats, recentResults)
-
-			if tt.wantPenalty && score > -3.0 {
-				t.Errorf("CalculatePriority(%d) = %v, want <= -3.0", tt.num, score)
-			}
-			if !tt.wantPenalty && score < 0 {
-				t.Errorf("CalculatePriority(%d) = %v, want >= 0", tt.num, score)
-			}
-		})
+	score := scorer.CalculatePriority(99, stats, recentResults)
+	if score != ScoreNoAppearancePenalty {
+		t.Errorf("未出現の数字のスコア = %v, want %v", score, ScoreNoAppearancePenalty)
 	}
 }
 
-// TestWeightedScorer_RevivalCandidateBonus 復活候補のボーナスをテスト
-func TestWeightedScorer_RevivalCandidateBonus(t *testing.T) {
+// TestWeightedScorer_LowFrequencyPenalty 低頻度ペナルティをテスト
+func TestWeightedScorer_LowFrequencyPenalty(t *testing.T) {
 	config := DefaultConfig()
 	scorer := NewWeightedScorer(config)
 
 	stats := StatisticalAnalysis{
-		RevivalCandidates: []int{25, 30, 35},
+		FrequencyMap: map[int]int{10: 3}, // 5回未満
 	}
 
-	recentResults := [][]string{} // 直近出現なし
-
-	tests := []struct {
-		name      string
-		num       int
-		wantBonus bool
-	}{
-		{
-			name:      "復活候補",
-			num:       25,
-			wantBonus: true,
-		},
-		{
-			name:      "復活候補でない",
-			num:       10,
-			wantBonus: false,
-		},
+	recentResults := [][]string{
+		{"1", "2", "3", "4", "5", "6", "7"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			score := scorer.CalculatePriority(tt.num, stats, recentResults)
-
-			if tt.wantBonus && score < 1.0 {
-				t.Errorf("CalculatePriority(%d) = %v, want >= 1.0", tt.num, score)
-			}
-			if !tt.wantBonus && score >= 1.0 {
-				t.Errorf("CalculatePriority(%d) = %v, want < 1.0", tt.num, score)
-			}
-		})
+	score := scorer.CalculatePriority(10, stats, recentResults)
+	if score >= 0 {
+		t.Errorf("低頻度の数字のスコア = %v, want negative", score)
 	}
 }

@@ -91,13 +91,9 @@ type AnalysisInfo struct {
 // ConfigInfo 設定情報
 type ConfigInfo struct {
 	MaxRecommendations int     `json:"max_recommendations"`
-	RecentAvoidCount   int     `json:"recent_avoid_count"`
-	ConsecutiveBoost   int     `json:"consecutive_boost"`
 	HistoryLookback    int     `json:"history_lookback"`
 	FrequencyWeight    float64 `json:"frequency_weight"`
 	RecentWeight       float64 `json:"recent_weight"`
-	ConsecutiveWeight  float64 `json:"consecutive_weight"`
-	PositionWeight     float64 `json:"position_weight"`
 }
 
 // ResultResponse 結果取得機能のレスポンス

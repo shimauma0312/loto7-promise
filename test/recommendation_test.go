@@ -17,13 +17,9 @@ func TestRecommendationDefaultConfig_StandardValues(t *testing.T) {
 		want interface{}
 	}{
 		{"MaxRecommendations", config.MaxRecommendations, 5},
-		{"RecentAvoidCount", config.RecentAvoidCount, 3},
-		{"ConsecutiveBoost", config.ConsecutiveBoost, 3},
 		{"HistoryLookback", config.HistoryLookback, 100},
-		{"FrequencyWeight", config.FrequencyWeight, 0.3},
-		{"RecentWeight", config.RecentWeight, 0.4},
-		{"ConsecutiveWeight", config.ConsecutiveWeight, 0.2},
-		{"PositionWeight", config.PositionWeight, 0.1},
+		{"FrequencyWeight", config.FrequencyWeight, 0.5},
+		{"RecentWeight", config.RecentWeight, 0.5},
 	}
 
 	for _, tt := range tests {
@@ -63,7 +59,7 @@ func TestLoadData_Success(t *testing.T) {
 	config := recommendation.DefaultConfig()
 	engine := recommendation.NewRecommendationEngine(config)
 
-TestRecommendationDefaultConfig_StandardValues(t)
+	err := engine.LoadData(10)
 	if err != nil {
 		t.Fatalf("LoadData failed: %v", err)
 	}
@@ -290,7 +286,7 @@ func TestFormatRecommendations_EmptyRecommendations(t *testing.T) {
 func TestGetConfig_ReturnsCorrectConfig(t *testing.T) {
 	config := recommendation.DefaultConfig()
 	config.MaxRecommendations = 7
-	config.RecentAvoidCount = 5
+	config.HistoryLookback = 150
 
 	engine := recommendation.NewRecommendationEngine(config)
 	retrievedConfig := engine.GetConfig()
@@ -298,8 +294,8 @@ func TestGetConfig_ReturnsCorrectConfig(t *testing.T) {
 	if retrievedConfig.MaxRecommendations != 7 {
 		t.Errorf("GetConfig().MaxRecommendations = %d, want 7", retrievedConfig.MaxRecommendations)
 	}
-	if retrievedConfig.RecentAvoidCount != 5 {
-		t.Errorf("GetConfig().RecentAvoidCount = %d, want 5", retrievedConfig.RecentAvoidCount)
+	if retrievedConfig.HistoryLookback != 150 {
+		t.Errorf("GetConfig().HistoryLookback = %d, want 150", retrievedConfig.HistoryLookback)
 	}
 }
 

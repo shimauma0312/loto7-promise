@@ -27,18 +27,10 @@ func NewRecommendationEngine(config RecommendationConfig) *RecommendationEngine 
 	source := rand.NewSource(time.Now().UnixNano())
 	rng := rand.New(source)
 
-	// 各モジュールを初期化
+	// 各モジュールを初期化（バリデータは後で設定）
 	analyzer := NewDefaultAnalyzer()
 	scorer := NewWeightedScorer(config)
 	selector := NewZoneBasedSelector(rng, config)
-	validator := NewCompositeValidator(
-		&ZoneDistributionValidator{},
-		&OddEvenRatioValidator{},
-		&TotalSumValidator{},
-		&AverageValueValidator{},
-		&SmoothnessValidator{},
-		&CloseNumberPairValidator{},
-	)
 	formatter := &TextFormatter{}
 
 	return &RecommendationEngine{
@@ -46,7 +38,7 @@ func NewRecommendationEngine(config RecommendationConfig) *RecommendationEngine 
 		analyzer:  analyzer,
 		scorer:    scorer,
 		selector:  selector,
-		validator: validator,
+		validator: nil, // LoadData後に設定
 		formatter: formatter,
 		history: CombinationHistory{
 			Pairs: make(map[string]int),
@@ -66,6 +58,17 @@ func (re *RecommendationEngine) LoadData(count int) error {
 
 	// 統計分析を実行
 	re.statistics = re.analyzer.Analyze(re.results, re.config.HistoryLookback)
+
+	// バリデータを設定（過去の組み合わせチェックを含む）
+	re.validator = NewCompositeValidator(
+		&ZoneDistributionValidator{},
+		&OddEvenRatioValidator{},
+		&TotalSumValidator{},
+		&AverageValueValidator{},
+		&SmoothnessValidator{},
+		&CloseNumberPairValidator{},
+		NewPastCombinationValidator(re.results, 100), // 直近100回分をチェック
+	)
 
 	return nil
 }

@@ -1,5 +1,10 @@
 package recommendation
 
+import (
+	"sort"
+	"strconv"
+)
+
 const (
 	// バリデーション用の定数
 	TotalSumMin        = 100  // 合計値の最小値
@@ -180,4 +185,65 @@ func abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+// 過去の組み合わせと重複していないかバリデーションする実装
+type PastCombinationValidator struct {
+	recentResults [][]string
+	checkCount    int // 直近何回分をチェックするか
+}
+
+// 過去組み合わせバリデータを作成する
+func NewPastCombinationValidator(recentResults [][]string, checkCount int) *PastCombinationValidator {
+	return &PastCombinationValidator{
+		recentResults: recentResults,
+		checkCount:    checkCount,
+	}
+}
+
+// 過去の組み合わせと重複していないかチェックする
+func (v *PastCombinationValidator) Validate(combination []int) bool {
+	// 組み合わせをソート
+	sortedCombination := make([]int, len(combination))
+	copy(sortedCombination, combination)
+	sort.Ints(sortedCombination)
+
+	// チェック範囲を決定
+	checkRange := v.checkCount
+	if checkRange > len(v.recentResults) {
+		checkRange = len(v.recentResults)
+	}
+
+	// 過去の全ての抽選結果と比較
+	for i := 0; i < checkRange; i++ {
+		// その回の数字を取得
+		drawNumbers := make([]int, 0, len(v.recentResults[i]))
+		for _, numStr := range v.recentResults[i] {
+			num, err := strconv.Atoi(numStr)
+			if err != nil {
+				continue
+			}
+			drawNumbers = append(drawNumbers, num)
+		}
+
+		// ソート
+		sort.Ints(drawNumbers)
+
+		// 完全一致チェック
+		if len(sortedCombination) == len(drawNumbers) {
+			isIdentical := true
+			for j := 0; j < len(sortedCombination); j++ {
+				if sortedCombination[j] != drawNumbers[j] {
+					isIdentical = false
+					break
+				}
+			}
+			// 同じ組み合わせが過去に存在した場合は却下
+			if isIdentical {
+				return false
+			}
+		}
+	}
+
+	return true
 }
