@@ -12,6 +12,37 @@ docker compose down
 
 ```
 
+## コマンドラインツール
+
+### ランダム番号生成
+各数字位置で過去に出現した範囲内からランダムに数字を選択します。
+未出現の数字は自動的に除外され、ロト7本来のランダム性を再現します。
+
+```bash
+# 基本的な使い方（過去100回分を分析、5組生成）
+go run cmd/random/main.go
+
+# 過去150回分を分析、3組生成
+go run cmd/random/main.go -count 150 -max 3
+
+# 各位置の出現範囲を表示
+go run cmd/random/main.go -verbose
+
+# ヘルプを表示
+go run cmd/random/main.go -help
+```
+
+### 統計ベース推薦番号生成
+統計分析に基づいて番号を推薦します。
+
+```bash
+# 基本的な使い方
+go run cmd/recommendation/main.go
+
+# 過去150回分を分析、3組生成
+go run cmd/recommendation/main.go -count 150 -max 3
+```
+
 ## APIサーバー構築呼び出し
 
 ### 1. APIサーバー起動
@@ -48,6 +79,15 @@ curl http://localhost:8080/api/heatmap?range=100
 ```bash
 # 番号の生成
 curl http://localhost:8080/api/recommendation
+```
+
+#### ランダム番号生成
+```bash
+# ランダム性を重視した番号の生成
+curl http://localhost:8080/api/v1/random
+
+# 過去の抽選データ範囲と生成数を指定
+curl "http://localhost:8080/api/v1/random?history=150&count=3"
 ```
 
 ## APIデプロイ
