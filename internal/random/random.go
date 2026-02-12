@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shimauma0312/loto7-promise/internal/result"
@@ -222,12 +223,12 @@ func (re *RandomEngine) GetPositionRanges() []PositionRange {
 
 // 組み合わせをキー文字列に変換する
 func combinationKey(combination []int) string {
-	key := ""
+	var builder strings.Builder
 	for i, num := range combination {
 		if i > 0 {
-			key += "-"
+			builder.WriteString("-")
 		}
-		key += strconv.Itoa(num)
+		builder.WriteString(strconv.Itoa(num))
 	}
-	return key
+	return builder.String()
 }

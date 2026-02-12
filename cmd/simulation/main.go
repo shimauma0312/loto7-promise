@@ -12,11 +12,11 @@ import (
 
 func main() {
 	var (
-		dataCount   = flag.Int("data", 100, "分析に使用する過去の抽選回数")
-		simCount    = flag.Int("count", 1, "シミュレーション実行回数（統計取得用）")
-		userNumbers = flag.String("numbers", "", "ユーザーの選択数字（カンマ区切り、例: 1,5,10,15,20,25,30）")
+		history      = flag.Int("history", 100, "分析に使用する過去の抽選回数")
+		simulations  = flag.Int("simulations", 1, "シミュレーション実行回数（統計取得用）")
+		userNumbers  = flag.String("numbers", "", "ユーザーの選択数字（カンマ区切り、例: 1,5,10,15,20,25,30）")
 		autoGenerate = flag.Bool("auto", false, "ユーザーの数字を自動生成")
-		help        = flag.Bool("help", false, "ヘルプを表示")
+		help         = flag.Bool("help", false, "ヘルプを表示")
 	)
 
 	flag.Parse()
@@ -30,8 +30,8 @@ func main() {
 	engine := simulation.NewSimulationEngine()
 
 	// データを読み込み
-	fmt.Printf("過去%d回分のデータを読み込み中...\n", *dataCount)
-	if err := engine.LoadData(*dataCount); err != nil {
+	fmt.Printf("過去%d回分のデータを読み込み中...\n", *history)
+	if err := engine.LoadData(*history); err != nil {
 		fmt.Printf("エラー: %v\n", err)
 		os.Exit(1)
 	}
@@ -69,12 +69,12 @@ func main() {
 	fmt.Println(strings.Repeat("=", 60))
 
 	// シミュレーション実行
-	if *simCount == 1 {
+	if *simulations == 1 {
 		// 1回のシミュレーション
 		runSingleSimulation(engine, userNums)
 	} else {
 		// 複数回のシミュレーション
-		runMultipleSimulations(engine, userNums, *simCount)
+		runMultipleSimulations(engine, userNums, *simulations)
 	}
 }
 
@@ -184,12 +184,12 @@ func showHelp() {
 	fmt.Println("  simulation [オプション]")
 	fmt.Println()
 	fmt.Println("オプション:")
-	fmt.Println("  -data int        分析に使用する過去の抽選回数 (デフォルト: 100)")
-	fmt.Println("  -count int       シミュレーション実行回数 (デフォルト: 1)")
-	fmt.Println("  -numbers string  ユーザーの選択数字（カンマ区切り）")
-	fmt.Println("                   例: -numbers 1,5,10,15,20,25,30")
-	fmt.Println("  -auto            ユーザーの数字を自動生成（デフォルト）")
-	fmt.Println("  -help            このヘルプを表示")
+	fmt.Println("  -history int        分析に使用する過去の抽選回数 (デフォルト: 100)")
+	fmt.Println("  -simulations int    シミュレーション実行回数 (デフォルト: 1)")
+	fmt.Println("  -numbers string     ユーザーの選択数字（カンマ区切り）")
+	fmt.Println("                      例: -numbers 1,5,10,15,20,25,30")
+	fmt.Println("  -auto               ユーザーの数字を自動生成（デフォルト）")
+	fmt.Println("  -help               このヘルプを表示")
 	fmt.Println()
 	fmt.Println("例:")
 	fmt.Println("  # 自動生成された数字で1回シミュレーション")
@@ -199,8 +199,8 @@ func showHelp() {
 	fmt.Println("  simulation -numbers 1,5,10,15,20,25,30")
 	fmt.Println()
 	fmt.Println("  # 10回シミュレーションして統計を取る")
-	fmt.Println("  simulation -count 10")
+	fmt.Println("  simulation -simulations 10")
 	fmt.Println()
 	fmt.Println("  # 指定した数字で10回シミュレーション")
-	fmt.Println("  simulation -numbers 1,5,10,15,20,25,30 -count 10")
+	fmt.Println("  simulation -numbers 1,5,10,15,20,25,30 -simulations 10")
 }

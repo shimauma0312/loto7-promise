@@ -23,7 +23,7 @@ docker compose down
 go run cmd/random/main.go
 
 # 過去150回分を分析、3組生成
-go run cmd/random/main.go -count 150 -max 3
+go run cmd/random/main.go -history 150 -count 3
 
 # 各位置の出現範囲を表示
 go run cmd/random/main.go -verbose
@@ -40,7 +40,7 @@ go run cmd/random/main.go -help
 go run cmd/recommendation/main.go
 
 # 過去150回分を分析、3組生成
-go run cmd/recommendation/main.go -count 150 -max 3
+go run cmd/recommendation/main.go -history 150 -count 3
 ```
 
 ### 1等当選シミュレーター
@@ -54,10 +54,10 @@ go run cmd/simulation/main.go
 go run cmd/simulation/main.go -numbers 1,5,10,15,20,25,30
 
 # 10回シミュレーションして統計を取る
-go run cmd/simulation/main.go -count 10
+go run cmd/simulation/main.go -simulations 10
 
 # 指定した数字で10回シミュレーション
-go run cmd/simulation/main.go -numbers 1,5,10,15,20,25,30 -count 10
+go run cmd/simulation/main.go -numbers 1,5,10,15,20,25,30 -simulations 10
 
 # ヘルプを表示
 go run cmd/simulation/main.go -help

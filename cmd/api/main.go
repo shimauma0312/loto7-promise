@@ -21,6 +21,26 @@ var (
 	startTime = time.Now()
 )
 
+// クエリパラメータを解析して検証する
+func parseQueryParam(c *gin.Context, key string, defaultValue, min, max int, errorMsg, errorCode string) (int, bool) {
+	strVal := c.Query(key)
+	if strVal == "" {
+		return defaultValue, true
+	}
+
+	if parsedVal, err := strconv.Atoi(strVal); err == nil && parsedVal >= min && parsedVal <= max {
+		return parsedVal, true
+	}
+
+	response := api.ErrorResponse(
+		errorCode,
+		errorMsg,
+		fmt.Sprintf("%s parameter must be between %d and %d", key, min, max),
+	)
+	c.JSON(http.StatusBadRequest, response)
+	return 0, false
+}
+
 func main() {
 	// モードを設定（本番環境では GIN_MODE=release を設定）
 	gin.SetMode(gin.DebugMode)
@@ -569,17 +589,18 @@ func getRecommendations(c *gin.Context) {
 	// クエリパラメータから設定を取得
 	config := recommendation.DefaultConfig()
 
-	if countStr := c.Query("count"); countStr != "" {
-		if count, err := strconv.Atoi(countStr); err == nil && count > 0 && count <= 10 {
-			config.MaxRecommendations = count
-		}
+	count, ok := parseQueryParam(c, "count", 5, 1, 10, "生成数は1-10の範囲で指定してください", "INVALID_COUNT")
+	if !ok {
+		return
 	}
+	config.MaxRecommendations = count
 
-	if historyStr := c.Query("history"); historyStr != "" {
-		if history, err := strconv.Atoi(historyStr); err == nil && history > 0 && history <= 1000 {
-			config.HistoryLookback = history
-		}
+	// DoS対策: historyは最大200に制限
+	history, ok := parseQueryParam(c, "history", 100, 1, 200, "履歴数は1-200の範囲で指定してください", "INVALID_HISTORY")
+	if !ok {
+		return
 	}
+	config.HistoryLookback = history
 
 	generateRecommendations(c, config)
 }
@@ -628,7 +649,8 @@ func getRecommendationsPost(c *gin.Context) {
 		if reqConfig.MaxRecommendations <= 0 || reqConfig.MaxRecommendations > 10 {
 			reqConfig.MaxRecommendations = 5
 		}
-		if reqConfig.HistoryLookback <= 0 || reqConfig.HistoryLookback > 1000 {
+		// DoS対策: historyは最大200に制限
+		if reqConfig.HistoryLookback <= 0 || reqConfig.HistoryLookback > 200 {
 			reqConfig.HistoryLookback = 100
 		}
 	}
@@ -888,37 +910,16 @@ func formatNumberList(numbers []int) string {
 //   - 400 Bad Request: パラメータが範囲外
 //   - 500 Internal Server Error: データ読み込みまたは生成に失敗
 func getRandom(c *gin.Context) {
-	// デフォルト値
-	count := 5
-	historyCount := 100
-
 	// クエリパラメータから設定を取得
-	if countStr := c.Query("count"); countStr != "" {
-		if parsedCount, err := strconv.Atoi(countStr); err == nil && parsedCount > 0 && parsedCount <= 10 {
-			count = parsedCount
-		} else {
-			response := api.ErrorResponse(
-				"INVALID_COUNT",
-				"生成数は1-10の範囲で指定してください",
-				"count parameter must be between 1 and 10",
-			)
-			c.JSON(http.StatusBadRequest, response)
-			return
-		}
+	count, ok := parseQueryParam(c, "count", 5, 1, 10, "生成数は1-10の範囲で指定してください", "INVALID_COUNT")
+	if !ok {
+		return
 	}
 
-	if historyStr := c.Query("history"); historyStr != "" {
-		if parsedHistory, err := strconv.Atoi(historyStr); err == nil && parsedHistory > 0 && parsedHistory <= 1000 {
-			historyCount = parsedHistory
-		} else {
-			response := api.ErrorResponse(
-				"INVALID_HISTORY",
-				"履歴数は1-1000の範囲で指定してください",
-				"history parameter must be between 1 and 1000",
-			)
-			c.JSON(http.StatusBadRequest, response)
-			return
-		}
+	// DoS対策: historyは最大200に制限
+	historyCount, ok := parseQueryParam(c, "history", 100, 1, 200, "履歴数は1-200の範囲で指定してください", "INVALID_HISTORY")
+	if !ok {
+		return
 	}
 
 	// ランダムエンジンを作成
@@ -1029,11 +1030,12 @@ func runSimulation(c *gin.Context) {
 		return
 	}
 
+	// DoS対策: historyは最大200に制限
 	if req.HistoryCount <= 0 {
 		req.HistoryCount = 100
 	}
-	if req.HistoryCount > 1000 {
-		req.HistoryCount = 1000
+	if req.HistoryCount > 200 {
+		req.HistoryCount = 200
 	}
 
 	// ユーザーの数字チェック

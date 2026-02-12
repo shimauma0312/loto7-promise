@@ -48,18 +48,17 @@ func (s *WeightedScorer) CalculatePriority(num int, stats StatisticalAnalysis, r
 		}
 	}
 
-	// 2. 直近2回までの抽選結果での数字は、出現率をそれなりに下げる
+	// 2. 直近2回目の抽選結果での数字は、出現率をそれなりに下げる
 	if len(recentResults) > 1 {
-		for i := 1; i < 2 && i < len(recentResults); i++ {
-			for _, numStr := range recentResults[i] {
-				n, err := strconv.Atoi(numStr)
-				if err != nil {
-					continue
-				}
-				if n == num {
-					score += ScoreRecent2Penalty
-					break
-				}
+		// 直近2回目（インデックス1）をチェック
+		for _, numStr := range recentResults[1] {
+			n, err := strconv.Atoi(numStr)
+			if err != nil {
+				continue
+			}
+			if n == num {
+				score += ScoreRecent2Penalty
+				break
 			}
 		}
 	}

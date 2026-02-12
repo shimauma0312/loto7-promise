@@ -10,8 +10,8 @@ import (
 
 func main() {
 	var (
-		count   = flag.Int("count", 100, "分析する過去の抽選回数")
-		maxRand = flag.Int("max", 5, "生成するランダム組み合わせの数")
+		history = flag.Int("history", 100, "分析する過去の抽選回数")
+		count   = flag.Int("count", 5, "生成するランダム組み合わせの数")
 		verbose = flag.Bool("verbose", false, "各位置の出現範囲を表示")
 		help    = flag.Bool("help", false, "ヘルプを表示")
 	)
@@ -27,8 +27,8 @@ func main() {
 	engine := random.NewRandomEngine()
 
 	// データを読み込み
-	fmt.Printf("過去%d回分のデータを分析中...\n", *count)
-	if err := engine.LoadData(*count); err != nil {
+	fmt.Printf("過去%d回分のデータを分析中...\n", *history)
+	if err := engine.LoadData(*history); err != nil {
 		fmt.Printf("エラー: %v\n", err)
 		os.Exit(1)
 	}
@@ -39,8 +39,8 @@ func main() {
 	}
 
 	// ランダム組み合わせを生成
-	fmt.Printf("\n%d組のランダム組み合わせを生成中...\n", *maxRand)
-	combinations, err := engine.GenerateMultipleRandomCombinations(*maxRand)
+	fmt.Printf("\n%d組のランダム組み合わせを生成中...\n", *count)
+	combinations, err := engine.GenerateMultipleRandomCombinations(*count)
 	if err != nil {
 		fmt.Printf("生成エラー: %v\n", err)
 		os.Exit(1)
@@ -70,13 +70,13 @@ func showHelp() {
 	fmt.Println("  random [オプション]")
 	fmt.Println()
 	fmt.Println("オプション:")
-	fmt.Println("  -count int      分析する過去の抽選回数 (デフォルト: 100)")
-	fmt.Println("  -max int        生成するランダム組み合わせの数 (デフォルト: 5)")
+	fmt.Println("  -history int    分析する過去の抽選回数 (デフォルト: 100)")
+	fmt.Println("  -count int      生成するランダム組み合わせの数 (デフォルト: 5)")
 	fmt.Println("  -verbose        各位置の出現範囲を表示")
 	fmt.Println("  -help           このヘルプを表示")
 	fmt.Println()
 	fmt.Println("例:")
-	fmt.Println("  random -count 150 -max 3")
+	fmt.Println("  random -history 150 -count 3")
 	fmt.Println("  random -verbose")
 }
 

@@ -208,13 +208,13 @@ func (v *PastCombinationValidator) Validate(combination []int) bool {
 	copy(sortedCombination, combination)
 	sort.Ints(sortedCombination)
 
-	// 過去の抽選結果から、推薦番号の中の任意の1つが出現した回を探す
-	matchingDraws := [][]int{}
+	// チェック範囲を決定
 	checkRange := v.checkCount
 	if checkRange > len(v.recentResults) {
 		checkRange = len(v.recentResults)
 	}
 
+	// 過去の全ての抽選結果と比較
 	for i := 0; i < checkRange; i++ {
 		// その回の数字を取得
 		drawNumbers := make([]int, 0, len(v.recentResults[i]))
@@ -226,42 +226,14 @@ func (v *PastCombinationValidator) Validate(combination []int) bool {
 			drawNumbers = append(drawNumbers, num)
 		}
 
-		// 推薦番号のいずれかの数字が含まれているかチェック
-		hasMatch := false
-		for _, recNum := range sortedCombination {
-			for _, drawNum := range drawNumbers {
-				if recNum == drawNum {
-					hasMatch = true
-					break
-				}
-			}
-			if hasMatch {
-				break
-			}
-		}
-
-		// マッチした場合、その回の数字を記録
-		if hasMatch {
-			matchingDraws = append(matchingDraws, drawNumbers)
-		}
-
-		// 直近2回分を確認したら終了
-		if len(matchingDraws) >= 2 {
-			break
-		}
-	}
-
-	// マッチした過去の抽選結果と、推薦組み合わせが同じでないかチェック
-	for _, pastDraw := range matchingDraws {
-		sortedPastDraw := make([]int, len(pastDraw))
-		copy(sortedPastDraw, pastDraw)
-		sort.Ints(sortedPastDraw)
+		// ソート
+		sort.Ints(drawNumbers)
 
 		// 完全一致チェック
-		if len(sortedCombination) == len(sortedPastDraw) {
+		if len(sortedCombination) == len(drawNumbers) {
 			isIdentical := true
 			for j := 0; j < len(sortedCombination); j++ {
-				if sortedCombination[j] != sortedPastDraw[j] {
+				if sortedCombination[j] != drawNumbers[j] {
 					isIdentical = false
 					break
 				}
