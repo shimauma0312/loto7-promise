@@ -14,6 +14,7 @@ import (
 	"github.com/shimauma0312/loto7-promise/internal/random"
 	"github.com/shimauma0312/loto7-promise/internal/recommendation"
 	"github.com/shimauma0312/loto7-promise/internal/result"
+	"github.com/shimauma0312/loto7-promise/internal/simulation"
 )
 
 var (
@@ -65,6 +66,9 @@ func main() {
 
 		// ランダム生成機能
 		v1.GET("/random", getRandom)
+
+		// シミュレーション機能
+		v1.POST("/simulation", runSimulation)
 	}
 
 	// ルート
@@ -81,6 +85,7 @@ func main() {
 					"heatmap_table":   "/api/v1/heatmap/table",
 					"recommendations": "/api/v1/recommendations",
 					"random":          "/api/v1/random",
+					"simulation":      "/api/v1/simulation",
 				},
 				"documentation": "https://github.com/shimauma0312/loto7-promise",
 			},
@@ -133,6 +138,7 @@ func healthCheck(c *gin.Context) {
 			"heatmap_engine": "operational",
 			"recommendation": "operational",
 			"random":         "operational",
+			"simulation":     "operational",
 		},
 	}
 
@@ -954,13 +960,195 @@ func getRandom(c *gin.Context) {
 	data := api.RecommendationResponse{
 		Recommendations: randomSets,
 		AnalysisInfo: api.AnalysisInfo{
-			DataSource:   "cache",
-			HistoryCount: historyCount,
-			GeneratedAt:  time.Now(),
+			DataSource:    "cache",
+			AnalyzedDraws: historyCount,
+			GeneratedAt:   time.Now(),
+			Algorithm:     "random",
 		},
-		Config: nil, // ランダム生成なので設定なし
+		Config: api.ConfigInfo{}, // ランダム生成なので空の設定
 	}
 
 	response := api.SuccessResponse("ランダム組み合わせを生成しました", data)
 	c.JSON(http.StatusOK, response)
 }
+
+// ロト7の1等当選までのシミュレーションを実行する
+//
+// 機能:
+//   - ユーザーの選択数字で1等が当選するまで抽選を繰り返す
+//   - 試行回数、所要時間などの統計情報を返却
+//   - 複数回のシミュレーションにも対応
+//
+// リクエスト:
+//   - HTTP Method: POST
+//   - Path: /api/v1/simulation
+//   - Content-Type: application/json
+//   - Body:
+//   - user_numbers: ユーザーの選択数字（7個の整数配列）
+//   - simulation_count: シミュレーション実行回数（1-100、デフォルト: 1）
+//   - history_count: 分析する過去の抽選回数（1-1000、デフォルト: 100）
+//
+// レスポンス:
+//   - Status: 200 OK
+//   - Body: SimulationResponse形式のJSON
+//   - single_result: 単一シミュレーション結果（simulation_count=1の場合）
+//   - stats: 統計情報（simulation_count>1の場合）
+//
+// エラーレスポンス:
+//   - 400 Bad Request: パラメータ不正
+//   - 500 Internal Server Error: シミュレーション実行失敗
+func runSimulation(c *gin.Context) {
+	// リクエストボディ
+	var req struct {
+		UserNumbers      []int `json:"user_numbers"`
+		SimulationCount  int   `json:"simulation_count"`
+		HistoryCount     int   `json:"history_count"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response := api.ErrorResponse(
+			"INVALID_REQUEST",
+			"リクエストボディの解析に失敗しました",
+			err.Error(),
+		)
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	// デフォルト値の設定
+	if req.SimulationCount <= 0 {
+		req.SimulationCount = 1
+	}
+	if req.SimulationCount > 100 {
+		response := api.ErrorResponse(
+			"INVALID_COUNT",
+			"シミュレーション回数は1-100の範囲で指定してください",
+			"simulation_count must be between 1 and 100",
+		)
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	if req.HistoryCount <= 0 {
+		req.HistoryCount = 100
+	}
+	if req.HistoryCount > 1000 {
+		req.HistoryCount = 1000
+	}
+
+	// ユーザーの数字チェック
+	if len(req.UserNumbers) == 0 {
+		// 自動生成
+		engine := random.NewRandomEngine()
+		if err := engine.LoadData(req.HistoryCount); err != nil {
+			response := api.ErrorResponse(
+				"DATA_LOAD_ERROR",
+				"データの読み込みに失敗しました",
+				err.Error(),
+			)
+			c.JSON(http.StatusInternalServerError, response)
+			return
+		}
+
+		userNums, err := engine.GenerateRandomCombination()
+		if err != nil {
+			response := api.ErrorResponse(
+				"NUMBER_GENERATION_ERROR",
+				"ユーザー数字の生成に失敗しました",
+				err.Error(),
+			)
+			c.JSON(http.StatusInternalServerError, response)
+			return
+		}
+		req.UserNumbers = userNums
+	} else if len(req.UserNumbers) != 7 {
+		response := api.ErrorResponse(
+			"INVALID_NUMBERS",
+			"ユーザーの数字は7個必要です",
+			"user_numbers must contain exactly 7 numbers",
+		)
+		c.JSON(http.StatusBadRequest, response)
+		return
+	}
+
+	// シミュレーションエンジンを作成
+	simEngine := simulation.NewSimulationEngine()
+
+	// データを読み込み
+	if err := simEngine.LoadData(req.HistoryCount); err != nil {
+		response := api.ErrorResponse(
+			"DATA_LOAD_ERROR",
+			"シミュレーションデータの読み込みに失敗しました",
+			err.Error(),
+		)
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+
+	// シミュレーション実行
+	if req.SimulationCount == 1 {
+		// 単一シミュレーション
+		result, err := simEngine.RunSimulation(req.UserNumbers)
+		if err != nil {
+			response := api.ErrorResponse(
+				"SIMULATION_ERROR",
+				"シミュレーションの実行に失敗しました",
+				err.Error(),
+			)
+			c.JSON(http.StatusInternalServerError, response)
+			return
+		}
+
+		data := map[string]interface{}{
+			"user_numbers":    result.UserNumbers,
+			"draw_count":      result.DrawCount,
+			"winning_numbers": result.WinningNumbers,
+			"duration_ms":     result.Duration.Milliseconds(),
+			"estimated_cost":  result.DrawCount * 300,
+			"history_count":   req.HistoryCount,
+			"timestamp":       time.Now(),
+		}
+
+		response := api.SuccessResponse("シミュレーションが完了しました", data)
+		c.JSON(http.StatusOK, response)
+	} else {
+		// 複数シミュレーション
+		stats, err := simEngine.RunMultipleSimulations(req.SimulationCount, req.UserNumbers)
+		if err != nil {
+			response := api.ErrorResponse(
+				"SIMULATION_ERROR",
+				"シミュレーションの実行に失敗しました",
+				err.Error(),
+			)
+			c.JSON(http.StatusInternalServerError, response)
+			return
+		}
+
+		results := make([]map[string]interface{}, len(stats.Results))
+		for i, r := range stats.Results {
+			results[i] = map[string]interface{}{
+				"draw_count":      r.DrawCount,
+				"winning_numbers": r.WinningNumbers,
+				"duration_ms":     r.Duration.Milliseconds(),
+			}
+		}
+
+		data := map[string]interface{}{
+			"user_numbers":           req.UserNumbers,
+			"simulations":            stats.Simulations,
+			"min_draws":              stats.MinDraws,
+			"max_draws":              stats.MaxDraws,
+			"avg_draws":              stats.AvgDraws,
+			"median_draws":           stats.MedianDraws,
+			"total_duration_ms":      stats.TotalDuration.Milliseconds(),
+			"avg_estimated_cost":     int(stats.AvgDraws) * 300,
+			"results":                results,
+			"history_count":          req.HistoryCount,
+			"timestamp":              time.Now(),
+		}
+
+		response := api.SuccessResponse("複数シミュレーションが完了しました", data)
+		c.JSON(http.StatusOK, response)
+	}
+}
+

@@ -43,6 +43,26 @@ go run cmd/recommendation/main.go
 go run cmd/recommendation/main.go -count 150 -max 3
 ```
 
+### 1等当選シミュレーター
+ユーザーの選択数字で1等が当選するまでのシミュレーションを行います。
+
+```bash
+# 基本的な使い方（自動生成された数字で1回シミュレーション）
+go run cmd/simulation/main.go
+
+# 指定した数字で1回シミュレーション
+go run cmd/simulation/main.go -numbers 1,5,10,15,20,25,30
+
+# 10回シミュレーションして統計を取る
+go run cmd/simulation/main.go -count 10
+
+# 指定した数字で10回シミュレーション
+go run cmd/simulation/main.go -numbers 1,5,10,15,20,25,30 -count 10
+
+# ヘルプを表示
+go run cmd/simulation/main.go -help
+```
+
 ## APIサーバー構築呼び出し
 
 ### 1. APIサーバー起動
@@ -88,6 +108,38 @@ curl http://localhost:8080/api/v1/random
 
 # 過去の抽選データ範囲と生成数を指定
 curl "http://localhost:8080/api/v1/random?history=150&count=3"
+```
+
+#### 1等当選シミュレーション
+```bash
+# 自動生成された数字で1回シミュレーション
+curl -X POST http://localhost:8080/api/v1/simulation \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# 指定した数字で1回シミュレーション
+curl -X POST http://localhost:8080/api/v1/simulation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_numbers": [1, 5, 10, 15, 20, 25, 30]
+  }'
+
+# 10回シミュレーションして統計を取る
+curl -X POST http://localhost:8080/api/v1/simulation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_numbers": [1, 5, 10, 15, 20, 25, 30],
+    "simulation_count": 10
+  }'
+
+# 詳細設定
+curl -X POST http://localhost:8080/api/v1/simulation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_numbers": [1, 5, 10, 15, 20, 25, 30],
+    "simulation_count": 5,
+    "history_count": 150
+  }'
 ```
 
 ## APIデプロイ
