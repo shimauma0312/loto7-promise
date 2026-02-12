@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/shimauma0312/loto7-promise/internal/random"
 )
@@ -59,8 +60,6 @@ func main() {
 		fmt.Println()
 	}
 
-	// ロジックの説明
-	showRandomLogic()
 }
 
 func showHelp() {
@@ -86,13 +85,38 @@ func showPositionRanges(engine *random.RandomEngine) {
 	for _, r := range ranges {
 		fmt.Printf("位置 %d: %2d ~ %2d (出現数字: %d個)\n",
 			r.Position, r.Min, r.Max, len(r.Numbers))
+		
+		// 上位5個の頻出数字を表示
+		if len(r.Frequency) > 0 {
+			type numFreq struct {
+				num  int
+				freq int
+			}
+			freqs := make([]numFreq, 0, len(r.Frequency))
+			for num, freq := range r.Frequency {
+				freqs = append(freqs, numFreq{num, freq})
+			}
+			// 頻度の高い順にソート
+			sort.Slice(freqs, func(i, j int) bool {
+				if freqs[i].freq == freqs[j].freq {
+					return freqs[i].num < freqs[j].num
+				}
+				return freqs[i].freq > freqs[j].freq
+			})
+			
+			// 上位5個または全て表示
+			displayCount := 5
+			if len(freqs) < displayCount {
+				displayCount = len(freqs)
+			}
+			fmt.Print("  上位頻出: ")
+			for i := 0; i < displayCount; i++ {
+				if i > 0 {
+					fmt.Print(", ")
+				}
+				fmt.Printf("%d(%d回)", freqs[i].num, freqs[i].freq)
+			}
+			fmt.Println()
+		}
 	}
-}
-
-func showRandomLogic() {
-	fmt.Println()
-	fmt.Println("=== ランダム生成ロジック ===")
-	fmt.Println("各数字位置で過去に出現した範囲内から")
-	fmt.Println("ランダムに数字を選択します。")
-	fmt.Println("未出現の数字は自動的に除外されます。")
 }

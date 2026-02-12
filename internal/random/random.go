@@ -14,10 +14,11 @@ import (
 
 // 各位置での数字出現範囲
 type PositionRange struct {
-	Position int // 位置（1-7）
-	Min      int // 最小値
-	Max      int // 最大値
-	Numbers  []int // 出現した数字のリスト
+	Position  int        // 位置（1-7）
+	Min       int        // 最小値
+	Max       int        // 最大値
+	Numbers   []int      // 出現した数字のリスト
+	Frequency map[int]int // 各数字の出現回数（重み付き乱択用）
 }
 
 // ランダム推薦エンジン
@@ -51,10 +52,12 @@ func (re *RandomEngine) LoadData(count int) error {
 
 // 各位置での数字の出現範囲を分析する
 func (re *RandomEngine) analyzePositionRanges() {
-	// 各位置ごとに出現した数字を収集
+	// 各位置ごとに出現した数字と出現回数を収集
 	positionNumbers := make([]map[int]bool, 7)
+	positionFrequency := make([]map[int]int, 7)
 	for i := 0; i < 7; i++ {
 		positionNumbers[i] = make(map[int]bool)
+		positionFrequency[i] = make(map[int]int)
 	}
 
 	// 過去データから各位置の数字を収集
@@ -75,10 +78,11 @@ func (re *RandomEngine) analyzePositionRanges() {
 		// ソートして位置を確定
 		sort.Ints(numbers)
 
-		// 各位置に出現した数字を記録
+		// 各位置に出現した数字を記録し、出現回数をカウント
 		for pos, num := range numbers {
 			if pos < 7 {
 				positionNumbers[pos][num] = true
+				positionFrequency[pos][num]++
 			}
 		}
 	}
@@ -93,10 +97,11 @@ func (re *RandomEngine) analyzePositionRanges() {
 		if len(nums) == 0 {
 			// データがない場合のデフォルト範囲
 			re.ranges[pos] = PositionRange{
-				Position: pos + 1,
-				Min:      1,
-				Max:      37,
-				Numbers:  make([]int, 0),
+				Position:  pos + 1,
+				Min:       1,
+				Max:       37,
+				Numbers:   make([]int, 0),
+				Frequency: make(map[int]int),
 			}
 			continue
 		}
@@ -104,10 +109,11 @@ func (re *RandomEngine) analyzePositionRanges() {
 		sort.Ints(nums)
 
 		re.ranges[pos] = PositionRange{
-			Position: pos + 1,
-			Min:      nums[0],
-			Max:      nums[len(nums)-1],
-			Numbers:  nums,
+			Position:  pos + 1,
+			Min:       nums[0],
+			Max:       nums[len(nums)-1],
+			Numbers:   nums,
+			Frequency: positionFrequency[pos],
 		}
 	}
 }
@@ -172,8 +178,8 @@ func (re *RandomEngine) GenerateRandomCombination() ([]int, error) {
 			return nil, fmt.Errorf("位置 %d で選択可能な数字がありません", pos+1)
 		}
 
-		// ランダムに選択
-		selectedNum := availableCandidates[re.rng.Intn(len(availableCandidates))]
+		// 重み付き乱択で選択
+		selectedNum := re.weightedRandomSelect(availableCandidates, posRange.Frequency)
 		combination[pos] = selectedNum
 		usedNumbers[selectedNum] = true
 	}
@@ -182,6 +188,75 @@ func (re *RandomEngine) GenerateRandomCombination() ([]int, error) {
 	sort.Ints(combination)
 
 	return combination, nil
+}
+
+// 重み付き乱択で数字を選択する
+func (re *RandomEngine) weightedRandomSelect(candidates []int, frequency map[int]int) int {
+	if len(candidates) == 0 {
+		return 0
+	}
+
+	// 候補が1つの場合はそれを返す
+	if len(candidates) == 1 {
+		return candidates[0]
+	}
+
+	// 直近1回、2回の結果を取得して数字のセットを作成
+	recent1Numbers := make(map[int]bool)
+	recent2Numbers := make(map[int]bool)
+
+	if len(re.results) > 0 {
+		// 直近1回目の数字
+		for _, numStr := range re.results[0] {
+			if num, err := strconv.Atoi(numStr); err == nil {
+				recent1Numbers[num] = true
+			}
+		}
+	}
+
+	if len(re.results) > 1 {
+		// 直近2回目の数字
+		for _, numStr := range re.results[1] {
+			if num, err := strconv.Atoi(numStr); err == nil {
+				recent2Numbers[num] = true
+			}
+		}
+	}
+
+	// 各候補の重みを計算（直近ペナルティ適用）
+	totalWeight := 0.0
+	weights := make([]float64, len(candidates))
+	for i, num := range candidates {
+		weight := float64(frequency[num])
+		// 出現回数が0の場合は最小重み1を付与
+		if weight == 0 {
+			weight = 1.0
+		}
+
+		// 直近1回目に出現した数字：重みを大幅に減らす（0.05倍）
+		if recent1Numbers[num] {
+			weight *= 0.05
+		} else if recent2Numbers[num] {
+			// 直近2回目に出現した数字：重みを減らす（0.3倍）
+			weight *= 0.3
+		}
+
+		weights[i] = weight
+		totalWeight += weight
+	}
+
+	// 重みに基づいてランダム選択
+	randomValue := re.rng.Float64() * totalWeight
+	cumulativeWeight := 0.0
+	for i, weight := range weights {
+		cumulativeWeight += weight
+		if randomValue < cumulativeWeight {
+			return candidates[i]
+		}
+	}
+
+	// フォールバック（通常ここには到達しない）
+	return candidates[len(candidates)-1]
 }
 
 // 複数のランダム組み合わせを生成する
