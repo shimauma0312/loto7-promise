@@ -11,7 +11,7 @@ import (
 
 func main() {
 	var (
-		history = flag.Int("history", 100, "分析する過去の抽選回数")
+		history = flag.Int("history", 50, "分析する過去の抽選回数")
 		count   = flag.Int("count", 5, "生成するランダム組み合わせの数")
 		verbose = flag.Bool("verbose", false, "各位置の出現範囲を表示")
 		help    = flag.Bool("help", false, "ヘルプを表示")
