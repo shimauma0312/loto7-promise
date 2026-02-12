@@ -3,6 +3,7 @@ package random
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sort"
 	"strconv"
@@ -227,18 +228,19 @@ func (re *RandomEngine) weightedRandomSelect(candidates []int, frequency map[int
 	totalWeight := 0.0
 	weights := make([]float64, len(candidates))
 	for i, num := range candidates {
-		weight := float64(frequency[num])
-		// 出現回数が0の場合は最小重み1を付与
-		if weight == 0 {
-			weight = 1.0
+		// 頻度の平方根を取って重みの差を緩和
+		freq := float64(frequency[num])
+		if freq == 0 {
+			freq = 1.0
 		}
+		weight := math.Sqrt(freq)
 
-		// 直近1回目に出現した数字：重みを大幅に減らす（0.05倍）
+		// 直近1回目に出現した数字：重みを減らす（×0.2）
 		if recent1Numbers[num] {
-			weight *= 0.05
+			weight *= 0.2
 		} else if recent2Numbers[num] {
-			// 直近2回目に出現した数字：重みを減らす（0.3倍）
-			weight *= 0.3
+			// 直近2回目に出現した数字：重みをやや減らす（×0.6）
+			weight *= 0.6
 		}
 
 		weights[i] = weight
