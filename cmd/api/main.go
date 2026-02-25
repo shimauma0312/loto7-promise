@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shimauma0312/loto7-promise/internal/api"
 	"github.com/shimauma0312/loto7-promise/internal/heatmap"
+	"github.com/shimauma0312/loto7-promise/internal/prediction"
 	"github.com/shimauma0312/loto7-promise/internal/random"
 	"github.com/shimauma0312/loto7-promise/internal/recommendation"
 	"github.com/shimauma0312/loto7-promise/internal/result"
@@ -87,6 +88,10 @@ func main() {
 		// ランダム生成機能
 		v1.GET("/random", getRandom)
 
+		// 統計分析予測機能
+		v1.GET("/prediction", getPrediction)
+		v1.POST("/prediction", getPredictionPost)
+
 		// シミュレーション機能
 		v1.POST("/simulation", runSimulation)
 	}
@@ -105,6 +110,7 @@ func main() {
 					"heatmap_table":   "/api/v1/heatmap/table",
 					"recommendations": "/api/v1/recommendations",
 					"random":          "/api/v1/random",
+					"prediction":      "/api/v1/prediction",
 					"simulation":      "/api/v1/simulation",
 				},
 				"documentation": "https://github.com/shimauma0312/loto7-promise",
@@ -158,6 +164,7 @@ func healthCheck(c *gin.Context) {
 			"heatmap_engine": "operational",
 			"recommendation": "operational",
 			"random":         "operational",
+			"prediction":     "operational",
 			"simulation":     "operational",
 		},
 	}
@@ -971,6 +978,192 @@ func getRandom(c *gin.Context) {
 
 	response := api.SuccessResponse("ランダム組み合わせを生成しました", data)
 	c.JSON(http.StatusOK, response)
+}
+
+// GETリクエストで統計分析予測番号を生成する
+//
+// 機能:
+//   - ①ホット/コールド分析 ②パリティ ③大小バランス ④合計値 ⑤十の位グループ
+//     ⑥一の位種類数 ⑦引っ張り・斜め数字 ⑧ボーナス周辺の8フィルターを適用
+//   - ハードフィルター通過後にスコアリングし上位N件を返す
+//
+// リクエスト:
+//   - HTTP Method: GET
+//   - Path: /api/v1/prediction
+//   - Query Parameters（省略可）:
+//   - count: 生成口数 (1-10, デフォルト: 5)
+//   - history: 分析回数 (1-500, デフォルト: 100)
+//   - hot_cold, parity, size_balance, sum_range, tens_group,
+//     last_digit, pull, bonus, interval: 各フィルター重み (0.0-2.0)
+//
+// レスポンス:
+//   - Status: 200 OK
+//   - Body: PredictionResponse形式のJSON
+//
+// エラーレスポンス:
+//   - 400 Bad Request: パラメータ不正
+//   - 500 Internal Server Error: データ読み込みまたは予測生成失敗
+func getPrediction(c *gin.Context) {
+	count, ok := parseQueryParam(c, "count", 5, 1, 10, "生成数は1-10の範囲で指定してください", "INVALID_COUNT")
+	if !ok {
+		return
+	}
+	history, ok := parseQueryParam(c, "history", 100, 1, 500, "履歴数は1-500の範囲で指定してください", "INVALID_HISTORY")
+	if !ok {
+		return
+	}
+
+	cfg := prediction.DefaultConfig()
+	cfg.Count = count
+	cfg.History = history
+
+	// クエリパラメータで各フィルター重みを上書き
+	overrideWeight := func(key string, target *float64) {
+		if v := c.Query(key); v != "" {
+			if f, err := strconv.ParseFloat(v, 64); err == nil && f >= 0 && f <= 2.0 {
+				*target = f
+			}
+		}
+	}
+	overrideWeight("hot_cold", &cfg.Weights.HotCold)
+	overrideWeight("parity", &cfg.Weights.Parity)
+	overrideWeight("size_balance", &cfg.Weights.SizeBal)
+	overrideWeight("sum_range", &cfg.Weights.SumRange)
+	overrideWeight("tens_group", &cfg.Weights.TensGroup)
+	overrideWeight("last_digit", &cfg.Weights.LastDigit)
+	overrideWeight("pull", &cfg.Weights.Pull)
+	overrideWeight("bonus", &cfg.Weights.Bonus)
+	overrideWeight("interval", &cfg.Weights.Interval)
+
+	result, err := runPredictionEngine(cfg)
+	if err != nil {
+		response := api.ErrorResponse("PREDICTION_ERROR", "予測生成に失敗しました", err.Error())
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+
+	c.JSON(http.StatusOK, api.SuccessResponse("統計分析予測番号を生成しました", result))
+}
+
+// POSTリクエストでフィルター重みを細かく指定して統計分析予測番号を生成する
+//
+// リクエスト:
+//   - HTTP Method: POST
+//   - Path: /api/v1/prediction
+//   - Content-Type: application/json
+//   - Body: PredictionRequest形式のJSON
+//   - count: 生成口数 (デフォルト: 5)
+//   - history: 分析回数 (デフォルト: 100)
+//   - weights: 各フィルター重み
+//
+// レスポンス・エラー: GETと同様
+func getPredictionPost(c *gin.Context) {
+	var req api.PredictionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, api.ErrorResponse(
+			"INVALID_REQUEST", "リクエストボディの解析に失敗しました", err.Error(),
+		))
+		return
+	}
+
+	cfg := prediction.DefaultConfig()
+	if req.Count > 0 && req.Count <= 10 {
+		cfg.Count = req.Count
+	}
+	if req.History > 0 && req.History <= 500 {
+		cfg.History = req.History
+	}
+	// 重みは0より大きい値のみ適用
+	applyWeight := func(src float64, dst *float64) {
+		if src > 0 {
+			*dst = src
+		}
+	}
+	applyWeight(req.Weights.HotCold, &cfg.Weights.HotCold)
+	applyWeight(req.Weights.Parity, &cfg.Weights.Parity)
+	applyWeight(req.Weights.SizeBal, &cfg.Weights.SizeBal)
+	applyWeight(req.Weights.SumRange, &cfg.Weights.SumRange)
+	applyWeight(req.Weights.TensGroup, &cfg.Weights.TensGroup)
+	applyWeight(req.Weights.LastDigit, &cfg.Weights.LastDigit)
+	applyWeight(req.Weights.Pull, &cfg.Weights.Pull)
+	applyWeight(req.Weights.Bonus, &cfg.Weights.Bonus)
+	applyWeight(req.Weights.Interval, &cfg.Weights.Interval)
+
+	result, err := runPredictionEngine(cfg)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, api.ErrorResponse(
+			"PREDICTION_ERROR", "予測生成に失敗しました", err.Error(),
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, api.SuccessResponse("統計分析予測番号を生成しました", result))
+}
+
+// runPredictionEngine はエンジンを初期化してデータ読み込みから予測生成までを実行する
+func runPredictionEngine(cfg prediction.PredictionConfig) (api.PredictionResponse, error) {
+	engine := prediction.NewEngine()
+	if err := engine.LoadData(cfg.History); err != nil {
+		return api.PredictionResponse{}, err
+	}
+
+	res, err := engine.Generate(cfg)
+	if err != nil {
+		return api.PredictionResponse{}, err
+	}
+
+	// internal の PredictionResult を API レスポンス型に変換
+	combos := make([]api.PredictionCombination, len(res.Combinations))
+	for i, c := range res.Combinations {
+		combos[i] = api.PredictionCombination{
+			ID:         c.ID,
+			Numbers:    c.Numbers,
+			TotalScore: c.TotalScore,
+			ScoreDetail: api.PredictionScoreDetail{
+				HotColdScore:   c.ScoreDetail.HotColdScore,
+				ParityScore:    c.ScoreDetail.ParityScore,
+				SizeScore:      c.ScoreDetail.SizeScore,
+				SumScore:       c.ScoreDetail.SumScore,
+				TensScore:      c.ScoreDetail.TensScore,
+				LastDigitScore: c.ScoreDetail.LastDigitScore,
+				PullScore:      c.ScoreDetail.PullScore,
+				BonusScore:     c.ScoreDetail.BonusScore,
+				IntervalScore:  c.ScoreDetail.IntervalScore,
+			},
+		}
+	}
+
+	w := cfg.Weights
+	respCfg := api.PredictionRequest{
+		Count:   cfg.Count,
+		History: cfg.History,
+		Weights: api.PredictionFilterWeights{
+			HotCold:   w.HotCold,
+			Parity:    w.Parity,
+			SizeBal:   w.SizeBal,
+			SumRange:  w.SumRange,
+			TensGroup: w.TensGroup,
+			LastDigit: w.LastDigit,
+			Pull:      w.Pull,
+			Bonus:     w.Bonus,
+			Interval:  w.Interval,
+		},
+	}
+
+	return api.PredictionResponse{
+		Combinations: combos,
+		AnalysisInfo: api.PredictionAnalysisInfo{
+			AnalyzedDraws:    res.AnalysisInfo.AnalyzedDraws,
+			HotNumbers:       res.AnalysisInfo.HotNumbers,
+			ColdNumbers:      res.AnalysisInfo.ColdNumbers,
+			LastDrawNumbers:  res.AnalysisInfo.LastDrawNumbers,
+			LastBonusNumbers: res.AnalysisInfo.LastBonusNumbers,
+			LastDrawSum:      res.AnalysisInfo.LastDrawSum,
+			SumTrend:         res.AnalysisInfo.SumTrend,
+			GeneratedAt:      res.AnalysisInfo.GeneratedAt,
+		},
+		Config: respCfg,
+	}, nil
 }
 
 // ロト7の1等当選までのシミュレーションを実行する
