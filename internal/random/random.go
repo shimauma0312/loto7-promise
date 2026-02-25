@@ -202,29 +202,7 @@ func (re *RandomEngine) weightedRandomSelect(candidates []int, frequency map[int
 		return candidates[0]
 	}
 
-	// 直近1回、2回の結果を取得して数字のセットを作成
-	recent1Numbers := make(map[int]bool)
-	recent2Numbers := make(map[int]bool)
-
-	if len(re.results) > 0 {
-		// 直近1回目の数字
-		for _, numStr := range re.results[0] {
-			if num, err := strconv.Atoi(numStr); err == nil {
-				recent1Numbers[num] = true
-			}
-		}
-	}
-
-	if len(re.results) > 1 {
-		// 直近2回目の数字
-		for _, numStr := range re.results[1] {
-			if num, err := strconv.Atoi(numStr); err == nil {
-				recent2Numbers[num] = true
-			}
-		}
-	}
-
-	// 各候補の重みを計算（直近ペナルティ適用）
+	// 各候補の重みを計算
 	totalWeight := 0.0
 	weights := make([]float64, len(candidates))
 	for i, num := range candidates {
@@ -234,14 +212,6 @@ func (re *RandomEngine) weightedRandomSelect(candidates []int, frequency map[int
 			freq = 1.0
 		}
 		weight := math.Sqrt(freq)
-
-		// 直近1回目に出現した数字：重みを減らす（×0.2）
-		if recent1Numbers[num] {
-			weight *= 0.2
-		} else if recent2Numbers[num] {
-			// 直近2回目に出現した数字：重みをやや減らす（×0.6）
-			weight *= 0.6
-		}
 
 		weights[i] = weight
 		totalWeight += weight
