@@ -119,3 +119,63 @@ type HealthResponse struct {
 	Timestamp time.Time         `json:"timestamp"`
 	Services  map[string]string `json:"services"`
 }
+
+// PredictionFilterWeights は各フィルターの重み設定
+type PredictionFilterWeights struct {
+	HotCold   float64 `json:"hot_cold"`
+	Parity    float64 `json:"parity"`
+	SizeBal   float64 `json:"size_balance"`
+	SumRange  float64 `json:"sum_range"`
+	TensGroup float64 `json:"tens_group"`
+	LastDigit float64 `json:"last_digit"`
+	Pull      float64 `json:"pull"`
+	Bonus     float64 `json:"bonus"`
+	Interval  float64 `json:"interval"`
+}
+
+// PredictionRequest はPOST /api/v1/prediction のリクエストボディ
+type PredictionRequest struct {
+	Count   int                     `json:"count"`
+	History int                     `json:"history"`
+	Weights PredictionFilterWeights `json:"weights"`
+}
+
+// PredictionScoreDetail はフィルターごとのスコア内訳
+type PredictionScoreDetail struct {
+	HotColdScore   float64 `json:"hot_cold_score"`
+	ParityScore    float64 `json:"parity_score"`
+	SizeScore      float64 `json:"size_score"`
+	SumScore       float64 `json:"sum_score"`
+	TensScore      float64 `json:"tens_score"`
+	LastDigitScore float64 `json:"last_digit_score"`
+	PullScore      float64 `json:"pull_score"`
+	BonusScore     float64 `json:"bonus_score"`
+	IntervalScore  float64 `json:"interval_score"`
+}
+
+// PredictionCombination はスコア付き推薦組み合わせ
+type PredictionCombination struct {
+	ID          int                   `json:"id"`
+	Numbers     []int                 `json:"numbers"`
+	TotalScore  float64               `json:"total_score"`
+	ScoreDetail PredictionScoreDetail `json:"score_detail"`
+}
+
+// PredictionAnalysisInfo は予測生成時の分析メタデータ
+type PredictionAnalysisInfo struct {
+	AnalyzedDraws    int       `json:"analyzed_draws"`
+	HotNumbers       []int     `json:"hot_numbers"`
+	ColdNumbers      []int     `json:"cold_numbers"`
+	LastDrawNumbers  []int     `json:"last_draw_numbers"`
+	LastBonusNumbers []int     `json:"last_bonus_numbers"`
+	LastDrawSum      int       `json:"last_draw_sum"`
+	SumTrend         string    `json:"sum_trend"`
+	GeneratedAt      time.Time `json:"generated_at"`
+}
+
+// PredictionResponse は /api/v1/prediction のレスポンス
+type PredictionResponse struct {
+	Combinations []PredictionCombination `json:"combinations"`
+	AnalysisInfo PredictionAnalysisInfo  `json:"analysis_info"`
+	Config       PredictionRequest       `json:"config"`
+}
