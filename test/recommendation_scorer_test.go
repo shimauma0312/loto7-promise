@@ -43,7 +43,7 @@ func TestWeightedScorer_CalculatePriority(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score := scorer.CalculatePriority(tt.num, 0, stats, recentResults)
+			score := scorer.CalculatePriority(tt.num, 0, stats, recentResults, nil)
 			if tt.wantPositive && score <= 0 {
 				t.Errorf("CalculatePriority(%d) = %v, want positive", tt.num, score)
 			}
@@ -65,7 +65,7 @@ func TestWeightedScorer_Recent1ReturnsExactPenalty(t *testing.T) {
 	}
 	recentResults := [][]string{{"1", "2", "3", "4", "5", "6", "7"}}
 
-	score := scorer.CalculatePriority(1, 0, stats, recentResults)
+	score := scorer.CalculatePriority(1, 0, stats, recentResults, nil)
 	if score != recommendation.ScoreRecent1Penalty {
 		t.Errorf("score = %v, want %v", score, recommendation.ScoreRecent1Penalty)
 	}
@@ -85,7 +85,7 @@ func TestWeightedScorer_Recent2IsNegative(t *testing.T) {
 		{"8", "9", "10", "11", "12", "13", "14"},
 	}
 
-	score := scorer.CalculatePriority(8, 0, stats, recentResults)
+	score := scorer.CalculatePriority(8, 0, stats, recentResults, nil)
 	if score >= 0 {
 		t.Errorf("直近2回の数字のスコア = %v, want negative", score)
 	}
@@ -104,7 +104,7 @@ func TestWeightedScorer_Within50Boost(t *testing.T) {
 		{"5", "29", "30", "31", "32", "33", "34"},
 	}
 
-	score := scorer.CalculatePriority(5, 0, stats, recentResults)
+	score := scorer.CalculatePriority(5, 0, stats, recentResults, nil)
 	expected := 2 * recommendation.ScoreWithin50Boost
 	if score < expected {
 		t.Errorf("score = %v, want >= %v (2回分ブースト)", score, expected)
@@ -116,7 +116,7 @@ func TestWeightedScorer_NoAppearanceReturnsExactPenalty(t *testing.T) {
 	stats := recommendation.StatisticalAnalysis{FrequencyMap: map[int]int{}}
 	recentResults := [][]string{{"1", "2", "3", "4", "5", "6", "7"}}
 
-	score := scorer.CalculatePriority(37, 6, stats, recentResults)
+	score := scorer.CalculatePriority(37, 6, stats, recentResults, nil)
 	if score != recommendation.ScoreNoAppearancePenalty {
 		t.Errorf("score = %v, want %v", score, recommendation.ScoreNoAppearancePenalty)
 	}
@@ -129,7 +129,7 @@ func TestWeightedScorer_LowFrequencyIsNegative(t *testing.T) {
 	}
 	recentResults := [][]string{{"1", "2", "3", "4", "5", "6", "7"}}
 
-	score := scorer.CalculatePriority(10, 2, stats, recentResults)
+	score := scorer.CalculatePriority(10, 2, stats, recentResults, nil)
 	if score >= 0 {
 		t.Errorf("低頻度の数字のスコア = %v, want negative", score)
 	}

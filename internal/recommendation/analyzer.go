@@ -66,6 +66,22 @@ func (a *DefaultAnalyzer) Analyze(results [][]string, lookback int) StatisticalA
 		num  int
 		freq int
 	}
+
+	// scorer 用キャッシュ: RecentAvoidRange..Recent50CheckRange のドローを事前ソート
+	checkStart := RecentAvoidRange
+	checkEnd := Recent50CheckRange
+	if checkEnd > len(results) {
+		checkEnd = len(results)
+	}
+	if checkStart < checkEnd {
+		stats.RecentSortedDraws = make([][]int, checkEnd-checkStart)
+		for i := checkStart; i < checkEnd; i++ {
+			draw := parseDraw(results[i])
+			sort.Ints(draw)
+			stats.RecentSortedDraws[i-checkStart] = draw
+		}
+	}
+
 	var frequencies []numFreq
 	for num := 1; num <= 37; num++ {
 		frequencies = append(frequencies, numFreq{num: num, freq: stats.FrequencyMap[num]})

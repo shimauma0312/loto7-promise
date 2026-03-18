@@ -39,6 +39,9 @@ type StatisticalAnalysis struct {
 	// ポジション別統計（index 0 = 昇順1番目、index 6 = 昇順7番目）
 	PositionFrequencyMap   []map[int]int // PositionFrequencyMap[pos][num] = 出現回数
 	PositionLastAppearance []map[int]int // PositionLastAppearance[pos][num] = 最終出現インデックス（0=直近）
+	// scorer 最適化用キャッシュ：直近 RecentAvoidRange..Recent50CheckRange 回分のソート済みドロー
+	// 事前計算することで CalculatePriority 内のパース・ソートを割愛
+	RecentSortedDraws [][]int
 }
 
 // CombinationHistory は組み合わせ履歴を保持します

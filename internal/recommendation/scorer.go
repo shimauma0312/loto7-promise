@@ -17,49 +17,84 @@ const (
 	LowFrequencyThreshold    = 5       // 低頻度判定閾値
 )
 
+// 最適化可能なスコアリング重みパラメータ
+type ScorerWeights struct {
+	Recent1Penalty         float64    // 同ポジションで直近1回出現したペナルティ
+	Recent2Penalty         float64    // 同ポジションで直近2回目出現したペナルティ
+	Within50Boost          float64    // 直近3-50回・同ポジション出現1回あたりのブースト
+	LowFrequencyPenalty    float64    // 直近100回で 5 回未満のペナルティ
+	NoAppearancePenalty    float64    // 直近100回で未出現のペナルティ
+	PositionPenaltyScale   [7]float64 // ポジション別ペナルティスケール係数
+	PositionFrequencyWeight float64   // ポジション別履歴分布に基づく適合度ボーナスの重み
+}
+
+// 現在の定数値をそのまま使ったデフォルト重みを返す
+func DefaultScorerWeights() ScorerWeights {
+	return ScorerWeights{
+		Recent1Penalty:          ScoreRecent1Penalty,
+		Recent2Penalty:          ScoreRecent2Penalty,
+		Within50Boost:           ScoreWithin50Boost,
+		LowFrequencyPenalty:     ScoreLowFrequencyPenalty,
+		NoAppearancePenalty:     ScoreNoAppearancePenalty,
+		PositionPenaltyScale:    [7]float64{1, 1, 1, 1, 1, 1, 1},
+		PositionFrequencyWeight: 2.0, // 平均出現率の数字に +2.0 程度のボーナスがかかる設定
+	}
+}
+
 // 数字の優先度計算を行うインターフェース
 type Scorer interface {
 	// position は 0-indexed（0=昇順1番目 … 6=昇順7番目）
-	CalculatePriority(num int, position int, stats StatisticalAnalysis, recentResults [][]string) float64
+	// selected は選択済みの数字（EnsembleScorer でのベイズ条件付き確率計算に使用）
+	CalculatePriority(num int, position int, stats StatisticalAnalysis, recentResults [][]string, selected []int) float64
 }
 
 // 重み付きでスコアを計算する実装
 type WeightedScorer struct {
-	config RecommendationConfig
+	config  RecommendationConfig
+	weights ScorerWeights
 }
 
-// 重み付きスコアラーを作成する
+// デフォルト重みで重み付きスコアラーを作成する
 func NewWeightedScorer(config RecommendationConfig) *WeightedScorer {
-	return &WeightedScorer{
-		config: config,
-	}
+	return &WeightedScorer{config: config, weights: DefaultScorerWeights()}
+}
+
+// 指定した重みで重み付きスコアラーを作成する
+func NewWeightedScorerWithWeights(config RecommendationConfig, weights ScorerWeights) *WeightedScorer {
+	return &WeightedScorer{config: config, weights: weights}
 }
 
 // 数字の優先度を計算する
 //
 // position は 0-indexed。直近出現ペナルティはポジション単位で適用し、
 // 同ポジションに同じ数字が出た回の近さのみをペナルティ対象とする。
-func (s *WeightedScorer) CalculatePriority(num int, position int, stats StatisticalAnalysis, recentResults [][]string) float64 {
+// selected は EnsembleScorer のためのパラメータで、WeightedScorer では使用しない。
+func (s *WeightedScorer) CalculatePriority(num int, position int, stats StatisticalAnalysis, recentResults [][]string, selected []int) float64 {
 	score := 0.0
 
 	// 1. 同ポジションでの直近出現チェック
 	if position >= 0 && position < len(stats.PositionLastAppearance) {
 		posLast := stats.PositionLastAppearance[position]
 		if lastIdx, exists := posLast[num]; exists {
+			posScale := s.weights.PositionPenaltyScale[position]
 			if lastIdx == 0 {
-				return ScoreRecent1Penalty
+				return s.weights.Recent1Penalty * posScale
 			}
 			if lastIdx == 1 {
-				score += ScoreRecent2Penalty
+				score += s.weights.Recent2Penalty * posScale
 			}
 		}
 	} else {
 		// PositionLastAppearance が未設定のフォールバック（全体チェック）
+		fbScale := 1.0
+		if position >= 0 && position < 7 {
+			fbScale = s.weights.PositionPenaltyScale[position]
+		}
 		if len(recentResults) > 0 {
 			for _, numStr := range recentResults[0] {
 				n, err := strconv.Atoi(numStr)
 				if err == nil && n == num {
-					return ScoreRecent1Penalty
+					return s.weights.Recent1Penalty * fbScale
 				}
 			}
 		}
@@ -67,7 +102,7 @@ func (s *WeightedScorer) CalculatePriority(num int, position int, stats Statisti
 			for _, numStr := range recentResults[1] {
 				n, err := strconv.Atoi(numStr)
 				if err == nil && n == num {
-					score += ScoreRecent2Penalty
+					score += s.weights.Recent2Penalty * fbScale
 					break
 				}
 			}
@@ -77,12 +112,12 @@ func (s *WeightedScorer) CalculatePriority(num int, position int, stats Statisti
 	// 2. 直近100回で出現していない数字は、出現率が0になる
 	freq, exists := stats.FrequencyMap[num]
 	if !exists || freq == 0 {
-		return ScoreNoAppearancePenalty
+		return s.weights.NoAppearancePenalty
 	}
 
 	// 3. 直近100回で出現回数が5回未満の数字は、少しばかし出現率をマイナスする
 	if freq < LowFrequencyThreshold {
-		score += ScoreLowFrequencyPenalty
+		score += s.weights.LowFrequencyPenalty
 	}
 
 	// 4. 直近3回は除き、同ポジションで50回以内に出現した数字は、出現回数分ブーストされる
@@ -93,8 +128,15 @@ func (s *WeightedScorer) CalculatePriority(num int, position int, stats Statisti
 	}
 
 	within50Count := 0
-	if position >= 0 && position < len(stats.PositionFrequencyMap) {
-		// ポジション単位：同ポジションに出現した回数のみカウント
+	if len(stats.RecentSortedDraws) > 0 {
+		// 事前計算済みキャッシュを使う（高速パス: int比較のみ）
+		for _, sortedDraw := range stats.RecentSortedDraws {
+			if position < len(sortedDraw) && sortedDraw[position] == num {
+				within50Count++
+			}
+		}
+	} else if position >= 0 && position < len(stats.PositionFrequencyMap) {
+		// キャッシュなし・PositionFrequencyMap あり（従来のパース方式）
 		for i := checkStart; i < checkEnd; i++ {
 			draw := parseDraw(recentResults[i])
 			sortedDraw := make([]int, len(draw))
@@ -115,7 +157,25 @@ func (s *WeightedScorer) CalculatePriority(num int, position int, stats Statisti
 			}
 		}
 	}
-	score += float64(within50Count) * ScoreWithin50Boost
+	score += float64(within50Count) * s.weights.Within50Boost
+
+	// 5. ポジション別履歴分布に基づく適合度ボーナス
+	// PositionFrequencyMap[pos][num] = 過去履歴で num が pos に出現した回数
+	// 平均出現率（= 全ドロー数 / 37）と比べて多く出た数字ほど高ボーナス
+	if s.weights.PositionFrequencyWeight != 0 &&
+		position >= 0 && position < len(stats.PositionFrequencyMap) {
+		posMap := stats.PositionFrequencyMap[position]
+		totalAtPos := 0
+		for _, f := range posMap {
+			totalAtPos += f
+		}
+		if totalAtPos > 0 {
+			posFreq := float64(posMap[num])
+			// normalizedFreq: 1.0 = 均一分布と同じ、>1.0 = 平均より多い
+			normalizedFreq := posFreq / float64(totalAtPos) * float64(lotoTotalNumbers)
+			score += s.weights.PositionFrequencyWeight * normalizedFreq
+		}
+	}
 
 	return score
 }

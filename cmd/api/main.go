@@ -735,13 +735,19 @@ func generateRecommendations(c *gin.Context, config recommendation.Recommendatio
 		}
 	}
 
+	algorithm := "default-weights"
+	if engine.IsUsingLearnedWeights() {
+		algorithm = "learned-weights"
+	}
+
 	data := api.RecommendationResponse{
 		Recommendations: recSets,
 		AnalysisInfo: api.AnalysisInfo{
-			DataSource:    "cache",
-			AnalyzedDraws: engine.GetAnalyzedDrawsCount(),
-			GeneratedAt:   time.Now(),
-			Algorithm:     "human-intuition-based",
+			DataSource:     "cache",
+			AnalyzedDraws:  engine.GetAnalyzedDrawsCount(),
+			GeneratedAt:    time.Now(),
+			Algorithm:      algorithm,
+			LearnedWeights: engine.IsUsingLearnedWeights(),
 		},
 		Config: api.ConfigInfo{
 			MaxRecommendations: config.MaxRecommendations,

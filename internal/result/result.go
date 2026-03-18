@@ -202,6 +202,11 @@ func updateCache() error {
 		}
 	}
 
+	if len(latestData) == 0 {
+		// 新回のCSVがまだ公開されていない（抽選結果未発表）場合はスキップ
+		return nil
+	}
+
 	// latestDataを降順にソート（新しい→古い）
 	sort.Slice(latestData, func(i, j int) bool {
 		return latestData[i].DrawNumber > latestData[j].DrawNumber
@@ -212,20 +217,16 @@ func updateCache() error {
 		return err
 	}
 
+	// 実際に取得できた最大回号のみメタデータを更新する
+	// （CSVが未公開で取得失敗した回号を「取得済み」とみなさない）
+	actualLatest := latestData[0].DrawNumber
 	metadata := &CacheMetadata{
 		LastUpdated:   time.Now(),
-		LatestDrawNum: currentDrawNum,
+		LatestDrawNum: actualLatest,
 		TotalRecords:  len(updatedData),
 	}
 
-	if err := saveMetadata(metadata); err != nil {
-		return err
-	}
-
-	if len(latestData) > 0 {
-		// キャッシュ更新完了
-	}
-	return nil
+	return saveMetadata(metadata)
 }
 
 // getCachedResults キャッシュから指定回数分の結果を取得

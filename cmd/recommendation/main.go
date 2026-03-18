@@ -9,7 +9,7 @@ import (
 )
 
 //  1. フラグ解析: -history（分析回数）、-count（推薦数）などのオプションを受け取る
-//  2. RecommendationEngine 初期化: Analyzer / WeightedScorer / ZoneBasedSelector / TextFormatter を組み立てる
+//  2. RecommendationEngine 初期化: DefaultAnalyzer / WeightedScorer + BayesianEstimator + RandomForest (EnsembleScorer) / PoolBasedSelector / TextFormatter を組み立てる
 //  3. LoadData: 過去N回の抽選結果を取得し、統計分析（出現頻度・ホット数字・復活候補）と
 //     7種のバリデータ（ゾーン分布・奇偶比・合計値・近接ペアなど）を設定する
 //  4. GenerateRecommendations: ゾーン別の重み付き選択で候補を生成し、全制約を満たす組み合わせを採用する
@@ -35,6 +35,17 @@ func main() {
 
 	// エンジンを作成
 	engine := recommendation.NewRecommendationEngine(config)
+
+	// 重みの状況表示
+	if engine.IsUsingLearnedWeights() {
+		if engine.NeedsWeightUpdate() {
+			fmt.Printf("学習済み重みを使用中（%s）— 新回の抽選を検出。データ読み込み後に自動再学習します...\n", recommendation.WeightsFilePath)
+		} else {
+			fmt.Printf("学習済み重みを使用中（%s）\n", recommendation.WeightsFilePath)
+		}
+	} else {
+		fmt.Printf("学習データなし — データ読み込み後に初回学習を実行します...\n")
+	}
 
 	// データを読み込み
 	fmt.Printf("過去%d回分のデータを分析中...\n", *history)

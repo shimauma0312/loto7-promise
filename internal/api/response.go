@@ -82,10 +82,11 @@ type RecommendationSet struct {
 
 // AnalysisInfo 分析情報
 type AnalysisInfo struct {
-	DataSource    string    `json:"data_source"`
-	AnalyzedDraws int       `json:"analyzed_draws"`
-	GeneratedAt   time.Time `json:"generated_at"`
-	Algorithm     string    `json:"algorithm"`
+	DataSource     string    `json:"data_source"`
+	AnalyzedDraws  int       `json:"analyzed_draws"`
+	GeneratedAt    time.Time `json:"generated_at"`
+	Algorithm      string    `json:"algorithm"`
+	LearnedWeights bool      `json:"learned_weights"` // 学習済み重みを使用中かどうか
 }
 
 // ConfigInfo 設定情報
