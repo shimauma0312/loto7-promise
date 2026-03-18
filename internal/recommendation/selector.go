@@ -6,210 +6,95 @@ import (
 )
 
 const (
-	// ゾーン選択用の定数
-	Zone3SelectProbability = 0.2  // ゾーン3から3個選択する確率
-	MaxAttemptsFactor      = 10   // 最大試行回数の倍数
-	ScoreThreshold         = -0.5 // スコアの閾値
-	MinCandidates          = 3    // 最小候補数
-	BaseWeight             = 1.0  // ベースウェイト
-	MinWeight              = 0.1  // 最小ウェイト
+	BaseWeight = 1.0 // スコアのベース重み
+	MinWeight  = 0.1 // 最小重み
 )
 
-// 候補選択を行うインターフェース
+const (
+	lotoTotalNumbers = 37
+	lotoDrawCount    = 7
+)
+
+// 組み合わせ生成を行うインターフェース
 type Selector interface {
-	SelectFromZone(min, max, count int, usedNumbers map[int]bool, scorer Scorer, stats StatisticalAnalysis, recentResults [][]string) []int
 	GenerateCombination(scorer Scorer, stats StatisticalAnalysis, recentResults [][]string) []int
 }
 
-// ゾーンベースで候補を選択する実装
-type ZoneBasedSelector struct {
-	rng    *rand.Rand
-	config RecommendationConfig
+// 統計スコアを重みとしたプール非復元抽出で候補を選択する実装
+type PoolBasedSelector struct {
+	rng *rand.Rand
 }
 
-// ゾーンベースセレクターを作成する
-func NewZoneBasedSelector(rng *rand.Rand, config RecommendationConfig) *ZoneBasedSelector {
-	return &ZoneBasedSelector{
-		rng:    rng,
-		config: config,
-	}
+// 現在時刻シード済みの RNG を受け取り PoolBasedSelector を返す
+func NewPoolBasedSelector(rng *rand.Rand) *PoolBasedSelector {
+	return &PoolBasedSelector{rng: rng}
 }
 
-// 高度な分析に基づいた推薦を生成する
-func (s *ZoneBasedSelector) GenerateCombination(scorer Scorer, stats StatisticalAnalysis, recentResults [][]string) []int {
-	var combination []int
-	usedNumbers := make(map[int]bool)
-
-	// ゾーン1 (1-13): 3-4個選択
-	zone1Count := 3 + s.rng.Intn(2) // 3 or 4
-	zone1 := s.SelectFromZone(1, 13, zone1Count, usedNumbers, scorer, stats, recentResults)
-	combination = append(combination, zone1...)
-	for _, num := range zone1 {
-		usedNumbers[num] = true
+// 1-37 全数字をプールとし、統計スコアを重みとした非復元ルーレット選択で7個を生成する。
+//
+// 各数字のポジションは値ベースで推定する（数字の大きさ → ソート後の位置を線形マッピング）ため、
+// 順次充填方式の選択バイアスを回避しつつポジション単位のスコアリングを実現する。
+func (s *PoolBasedSelector) GenerateCombination(scorer Scorer, stats StatisticalAnalysis, recentResults [][]string) []int {
+	pool := make([]int, lotoTotalNumbers)
+	weights := make([]float64, lotoTotalNumbers)
+	for i := 0; i < lotoTotalNumbers; i++ {
+		num := i + 1
+		pool[i] = num
+		pos := estimatedPosition(num)
+		priority := scorer.CalculatePriority(num, pos, stats, recentResults)
+		weight := priority + BaseWeight
+		if weight < MinWeight {
+			weight = MinWeight
+		}
+		weights[i] = weight
 	}
 
-	// ゾーン3 (27-37): 2-3個選択（まれに3個）
-	zone3Count := 2
-	if s.rng.Float64() < Zone3SelectProbability { // 20%の確率て3個
-		zone3Count = 3
-	}
-	zone3 := s.SelectFromZone(27, 37, zone3Count, usedNumbers, scorer, stats, recentResults)
-	combination = append(combination, zone3...)
-	for _, num := range zone3 {
-		usedNumbers[num] = true
-	}
+	combination := make([]int, 0, lotoDrawCount)
+	size := lotoTotalNumbers
 
-	// ゾーン2 (14-26): 残りを埋める
-	zone2Count := 7 - len(combination)
-	zone2 := s.SelectFromZone(14, 26, zone2Count, usedNumbers, scorer, stats, recentResults)
-	combination = append(combination, zone2...)
-	for _, num := range zone2 {
-		usedNumbers[num] = true
-	}
+	for len(combination) < lotoDrawCount {
+		chosen := weightedRouletteSelect(s.rng, pool[:size], weights[:size])
 
-	// 7個に満たない場合は補完
-	if len(combination) < 7 {
-		combination = s.fillRemainingNumbers(combination, usedNumbers)
+		// pool から除去（末尾と交換）
+		for i := 0; i < size; i++ {
+			if pool[i] == chosen {
+				size--
+				pool[i] = pool[size]
+				weights[i] = weights[size]
+				break
+			}
+		}
+		combination = append(combination, chosen)
 	}
 
 	sort.Ints(combination)
 	return combination
 }
 
-// 指定ゾーンから数字を選択する
-func (s *ZoneBasedSelector) SelectFromZone(min, max, count int, usedNumbers map[int]bool, scorer Scorer, stats StatisticalAnalysis, recentResults [][]string) []int {
-	var selected []int
-	candidates := s.getZoneCandidates(min, max, usedNumbers, scorer, stats, recentResults)
-
-	// 候補が不足している場合は調整
-	if len(candidates) < count {
-		count = len(candidates)
+// 重み付きルーレット選択で candidates の中から1つを選ぶ
+func weightedRouletteSelect(rng *rand.Rand, candidates []int, weights []float64) int {
+	total := 0.0
+	for _, w := range weights {
+		total += w
 	}
-
-	attempts := 0
-	maxAttempts := count * MaxAttemptsFactor
-
-	for len(selected) < count && attempts < maxAttempts {
-		attempts++
-
-		if len(candidates) == 0 {
-			break
-		}
-
-		// 重み付きランダム選択
-		num := s.weightedSelectFromCandidates(candidates, usedNumbers, scorer, stats, recentResults)
-		if num == 0 {
-			continue
-		}
-
-		if !usedNumbers[num] {
-			selected = append(selected, num)
-			usedNumbers[num] = true
-
-			// 選択済みの候補を削除
-			newCandidates := []int{}
-			for _, c := range candidates {
-				if c != num {
-					newCandidates = append(newCandidates, c)
-				}
-			}
-			candidates = newCandidates
+	r := rng.Float64() * total
+	cumulative := 0.0
+	for i, w := range weights {
+		cumulative += w
+		if r < cumulative {
+			return candidates[i]
 		}
 	}
-
-	return selected
+	return candidates[len(candidates)-1]
 }
 
-// ゾーンから候補数字を取得する
-func (s *ZoneBasedSelector) getZoneCandidates(min, max int, usedNumbers map[int]bool, scorer Scorer, stats StatisticalAnalysis, recentResults [][]string) []int {
-	var candidates []int
-
-	for num := min; num <= max; num++ {
-		if usedNumbers[num] {
-			continue
-		}
-
-		// スコア計算
-		score := scorer.CalculatePriority(num, stats, recentResults)
-
-		// スコアが一定以上の数字を候補に
-		if score > ScoreThreshold { // 闾値
-			candidates = append(candidates, num)
-		}
+// 数字の値から「ソート後に何番目になるか」を線形推定する（0-indexed）
+//
+// 全37数字を7ポジションに均等マッピング。例: num=1-6→pos0, 7-11→pos1, ...
+func estimatedPosition(num int) int {
+	pos := (num - 1) * lotoDrawCount / lotoTotalNumbers
+	if pos >= lotoDrawCount {
+		pos = lotoDrawCount - 1
 	}
-
-	// 候補が少なすぎる場合は範囲内すべてを候補に
-	if len(candidates) < MinCandidates {
-		candidates = []int{}
-		for num := min; num <= max; num++ {
-			if !usedNumbers[num] {
-				candidates = append(candidates, num)
-			}
-		}
-	}
-
-	return candidates
-}
-
-// 候補から重み付き選択する
-func (s *ZoneBasedSelector) weightedSelectFromCandidates(candidates []int, usedNumbers map[int]bool, scorer Scorer, stats StatisticalAnalysis, recentResults [][]string) int {
-	if len(candidates) == 0 {
-		return 0
-	}
-
-	type weightedNum struct {
-		num    int
-		weight float64
-	}
-
-	var weighted []weightedNum
-	totalWeight := 0.0
-
-	for _, num := range candidates {
-		if usedNumbers[num] {
-			continue
-		}
-
-		priority := scorer.CalculatePriority(num, stats, recentResults)
-		weight := priority + BaseWeight // 最低限の重み
-		if weight < MinWeight {
-			weight = MinWeight
-		}
-
-		weighted = append(weighted, weightedNum{num: num, weight: weight})
-		totalWeight += weight
-	}
-
-	if len(weighted) == 0 || totalWeight == 0 {
-		return 0
-	}
-
-	// ルーレット選択
-	randomValue := s.rng.Float64() * totalWeight
-	currentWeight := 0.0
-
-	for _, wn := range weighted {
-		currentWeight += wn.weight
-		if randomValue <= currentWeight {
-			return wn.num
-		}
-	}
-
-	// フォールバック
-	if len(weighted) > 0 {
-		return weighted[s.rng.Intn(len(weighted))].num
-	}
-
-	return 0
-}
-
-// 残りの数字を補完する
-func (s *ZoneBasedSelector) fillRemainingNumbers(combination []int, usedNumbers map[int]bool) []int {
-	for num := 1; num <= 37 && len(combination) < 7; num++ {
-		if !usedNumbers[num] {
-			combination = append(combination, num)
-			usedNumbers[num] = true
-		}
-	}
-	return combination
+	return pos
 }

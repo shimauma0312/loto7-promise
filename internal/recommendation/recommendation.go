@@ -23,14 +23,12 @@ type RecommendationEngine struct {
 
 // 推薦エンジンを作成する
 func NewRecommendationEngine(config RecommendationConfig) *RecommendationEngine {
-	// 現在時刻をシードにしてランダムジェネレータ初期化
 	source := rand.NewSource(time.Now().UnixNano())
 	rng := rand.New(source)
 
-	// 各モジュールを初期化（バリデータは後で設定）
 	analyzer := NewDefaultAnalyzer()
 	scorer := NewWeightedScorer(config)
-	selector := NewZoneBasedSelector(rng, config)
+	selector := NewPoolBasedSelector(rng)
 	formatter := &TextFormatter{}
 
 	return &RecommendationEngine{
@@ -38,7 +36,7 @@ func NewRecommendationEngine(config RecommendationConfig) *RecommendationEngine 
 		analyzer:  analyzer,
 		scorer:    scorer,
 		selector:  selector,
-		validator: nil, // LoadData後に設定
+		validator: nil,
 		formatter: formatter,
 		history: CombinationHistory{
 			Pairs: make(map[string]int),
@@ -48,7 +46,7 @@ func NewRecommendationEngine(config RecommendationConfig) *RecommendationEngine 
 
 // データを読み込む
 func (re *RecommendationEngine) LoadData(count int) error {
-	re.results = result.GetResult(count)
+	re.results = FilterAbnormalResults(result.GetResult(count))
 	if len(re.results) == 0 {
 		return fmt.Errorf("データを取得できませんでした")
 	}
@@ -80,14 +78,13 @@ func (re *RecommendationEngine) GenerateRecommendations() ([][]int, error) {
 	}
 
 	var recommendations [][]int
-	maxAttempts := 2000 // 試行回数を増やす（制約が厳しくなったため）
+	maxAttempts := 2000
 
-	// 各推薦を生成
 	for rec := 0; rec < re.config.MaxRecommendations; rec++ {
 		for attempt := 0; attempt < maxAttempts; attempt++ {
 			combination := re.selector.GenerateCombination(re.scorer, re.statistics, re.results)
 
-			// すべての制約をチェック
+			// 全制約をパスした組み合わせを採用
 			if len(combination) == 7 &&
 				re.validator.Validate(combination) &&
 				!re.isDuplicateCombination(combination, recommendations) {
@@ -100,7 +97,6 @@ func (re *RecommendationEngine) GenerateRecommendations() ([][]int, error) {
 	return recommendations, nil
 }
 
-// 重複する組み合わせかチェックする
 func (re *RecommendationEngine) isDuplicateCombination(newComb []int, existing [][]int) bool {
 	for _, existingComb := range existing {
 		if len(newComb) != len(existingComb) {
@@ -117,7 +113,7 @@ func (re *RecommendationEngine) isDuplicateCombination(newComb []int, existing [
 			}
 		}
 
-		// 5個以上一致する場合は重複とみなす
+		// 5個以上一致する組み合わせは重複とみなす
 		if matches >= 5 {
 			return true
 		}

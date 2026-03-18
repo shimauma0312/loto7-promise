@@ -22,9 +22,17 @@ func NewDefaultAnalyzer() *DefaultAnalyzer {
 
 // 過去データの統計分析を実行する
 func (a *DefaultAnalyzer) Analyze(results [][]string, lookback int) StatisticalAnalysis {
+	const drawSize = 7
+
 	stats := StatisticalAnalysis{
-		FrequencyMap:   make(map[int]int),
-		LastAppearance: make(map[int]int),
+		FrequencyMap:           make(map[int]int),
+		LastAppearance:         make(map[int]int),
+		PositionFrequencyMap:   make([]map[int]int, drawSize),
+		PositionLastAppearance: make([]map[int]int, drawSize),
+	}
+	for p := 0; p < drawSize; p++ {
+		stats.PositionFrequencyMap[p] = make(map[int]int)
+		stats.PositionLastAppearance[p] = make(map[int]int)
 	}
 
 	// 過去lookback回分の出現回数をカウント
@@ -32,19 +40,23 @@ func (a *DefaultAnalyzer) Analyze(results [][]string, lookback int) StatisticalA
 		lookback = len(results)
 	}
 
-	// 各数字の出現回数と最終出現位置を記録
+	// 各数字の出現回数・最終出現インデックスと、ポジション別の同統計を記録
 	for i := 0; i < lookback; i++ {
-		for _, numStr := range results[i] {
-			num, err := strconv.Atoi(numStr)
-			if err != nil {
-				// 不正なフォーマットの場合はスキップ
-				continue
-			}
-			stats.FrequencyMap[num]++
+		// ソートして1番小さい順にポジションを決定
+		draw := parseDraw(results[i])
+		sort.Ints(draw)
 
-			// 最終出現位置を更新（最新の結果が0）
+		for pos, num := range draw {
+			stats.FrequencyMap[num]++
 			if _, exists := stats.LastAppearance[num]; !exists {
 				stats.LastAppearance[num] = i
+			}
+
+			if pos < drawSize {
+				stats.PositionFrequencyMap[pos][num]++
+				if _, exists := stats.PositionLastAppearance[pos][num]; !exists {
+					stats.PositionLastAppearance[pos][num] = i
+				}
 			}
 		}
 	}
@@ -147,4 +159,16 @@ func (a *DefaultAnalyzer) BuildCombinationHistory(results [][]string) Combinatio
 	}
 
 	return history
+}
+
+// 1回分の抽選結果文字列スライスを int スライスに変換する（不正フォーマットは無視）
+func parseDraw(draw []string) []int {
+	nums := make([]int, 0, len(draw))
+	for _, s := range draw {
+		n, err := strconv.Atoi(s)
+		if err == nil {
+			nums = append(nums, n)
+		}
+	}
+	return nums
 }

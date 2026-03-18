@@ -1,6 +1,9 @@
 package recommendation
 
-import "strconv"
+import (
+	"sort"
+	"strconv"
+)
 
 const (
 	// スコア計算用の定数
@@ -16,7 +19,8 @@ const (
 
 // 数字の優先度計算を行うインターフェース
 type Scorer interface {
-	CalculatePriority(num int, stats StatisticalAnalysis, recentResults [][]string) float64
+	// position は 0-indexed（0=昇順1番目 … 6=昇順7番目）
+	CalculatePriority(num int, position int, stats StatisticalAnalysis, recentResults [][]string) float64
 }
 
 // 重み付きでスコアを計算する実装
@@ -32,50 +36,56 @@ func NewWeightedScorer(config RecommendationConfig) *WeightedScorer {
 }
 
 // 数字の優先度を計算する
-func (s *WeightedScorer) CalculatePriority(num int, stats StatisticalAnalysis, recentResults [][]string) float64 {
+//
+// position は 0-indexed。直近出現ペナルティはポジション単位で適用し、
+// 同ポジションに同じ数字が出た回の近さのみをペナルティ対象とする。
+func (s *WeightedScorer) CalculatePriority(num int, position int, stats StatisticalAnalysis, recentResults [][]string) float64 {
 	score := 0.0
 
-	// 1. 直近1回の抽選結果での数字は、出現率を限りなく低いレベルで下げる
-	if len(recentResults) > 0 {
-		for _, numStr := range recentResults[0] {
-			n, err := strconv.Atoi(numStr)
-			if err != nil {
-				continue
+	// 1. 同ポジションでの直近出現チェック
+	if position >= 0 && position < len(stats.PositionLastAppearance) {
+		posLast := stats.PositionLastAppearance[position]
+		if lastIdx, exists := posLast[num]; exists {
+			if lastIdx == 0 {
+				return ScoreRecent1Penalty
 			}
-			if n == num {
-				return ScoreRecent1Penalty // 即座に大幅減点で返す
-			}
-		}
-	}
-
-	// 2. 直近2回目の抽選結果での数字は、出現率をそれなりに下げる
-	if len(recentResults) > 1 {
-		// 直近2回目（インデックス1）をチェック
-		for _, numStr := range recentResults[1] {
-			n, err := strconv.Atoi(numStr)
-			if err != nil {
-				continue
-			}
-			if n == num {
+			if lastIdx == 1 {
 				score += ScoreRecent2Penalty
-				break
+			}
+		}
+	} else {
+		// PositionLastAppearance が未設定のフォールバック（全体チェック）
+		if len(recentResults) > 0 {
+			for _, numStr := range recentResults[0] {
+				n, err := strconv.Atoi(numStr)
+				if err == nil && n == num {
+					return ScoreRecent1Penalty
+				}
+			}
+		}
+		if len(recentResults) > 1 {
+			for _, numStr := range recentResults[1] {
+				n, err := strconv.Atoi(numStr)
+				if err == nil && n == num {
+					score += ScoreRecent2Penalty
+					break
+				}
 			}
 		}
 	}
 
-	// 3. 直近100回で出現していない数字は、出現率が0になる
+	// 2. 直近100回で出現していない数字は、出現率が0になる
 	freq, exists := stats.FrequencyMap[num]
 	if !exists || freq == 0 {
 		return ScoreNoAppearancePenalty
 	}
 
-	// 4. 直近100回で出現回数が5回未満の数字は、少しばかし出現率をマイナスする
+	// 3. 直近100回で出現回数が5回未満の数字は、少しばかし出現率をマイナスする
 	if freq < LowFrequencyThreshold {
 		score += ScoreLowFrequencyPenalty
 	}
 
-	// 5. 直近3回は除き、50回以内に出現した数字は、出現回数分ブーストされる
-	// 直近3回を除いた範囲（3回目から50回目）をチェック
+	// 4. 直近3回は除き、同ポジションで50回以内に出現した数字は、出現回数分ブーストされる
 	checkStart := RecentAvoidRange
 	checkEnd := Recent50CheckRange
 	if checkEnd > len(recentResults) {
@@ -83,14 +93,25 @@ func (s *WeightedScorer) CalculatePriority(num int, stats StatisticalAnalysis, r
 	}
 
 	within50Count := 0
-	for i := checkStart; i < checkEnd; i++ {
-		for _, numStr := range recentResults[i] {
-			n, err := strconv.Atoi(numStr)
-			if err != nil {
-				continue
-			}
-			if n == num {
+	if position >= 0 && position < len(stats.PositionFrequencyMap) {
+		// ポジション単位：同ポジションに出現した回数のみカウント
+		for i := checkStart; i < checkEnd; i++ {
+			draw := parseDraw(recentResults[i])
+			sortedDraw := make([]int, len(draw))
+			copy(sortedDraw, draw)
+			sort.Ints(sortedDraw)
+			if position < len(sortedDraw) && sortedDraw[position] == num {
 				within50Count++
+			}
+		}
+	} else {
+		// グローバルフォールバック（PositionFrequencyMap 未設定時）
+		for i := checkStart; i < checkEnd; i++ {
+			for _, numStr := range recentResults[i] {
+				n, err := strconv.Atoi(numStr)
+				if err == nil && n == num {
+					within50Count++
+				}
 			}
 		}
 	}

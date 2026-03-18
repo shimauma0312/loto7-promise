@@ -1,4 +1,4 @@
-// 過去の出現範囲を分析し、その範囲内でランダムに数字を選択する
+// 過去の抽選頻度に基づいた重み付き非復元抽出でロト7の組み合わせを生成する。
 package random
 
 import (
@@ -13,225 +13,126 @@ import (
 	"github.com/shimauma0312/loto7-promise/internal/result"
 )
 
-// 各位置での数字出現範囲
-type PositionRange struct {
-	Position  int        // 位置（1-7）
-	Min       int        // 最小値
-	Max       int        // 最大値
-	Numbers   []int      // 出現した数字のリスト
-	Frequency map[int]int // 各数字の出現回数（重み付き乱択用）
+const (
+	// TotalNumbers はロト7の総数字数
+	TotalNumbers = 37
+	// DrawCount は1回の抽選で引く数字数
+	DrawCount = 7
+)
+
+// 数字ごとの出現統計
+type NumberStat struct {
+	Number    int
+	Frequency int // 過去データでの出現回数
 }
 
-// ランダム推薦エンジン
+// 過去の出現頻度を重みとした重み付き非復元抽出で組み合わせを生成するエンジン
 type RandomEngine struct {
-	rng     *rand.Rand
-	results [][]string
-	ranges  []PositionRange
+	rng       *rand.Rand
+	results   [][]string
+	frequency map[int]int // 各数字の出現回数（1-37）
 }
 
-// ランダムエンジンを作成する
+// 現在時刻をシードに初期化したエンジンを返す
 func NewRandomEngine() *RandomEngine {
 	source := rand.NewSource(time.Now().UnixNano())
 	return &RandomEngine{
-		rng:    rand.New(source),
-		ranges: make([]PositionRange, 7),
+		rng:       rand.New(source),
+		frequency: make(map[int]int),
 	}
 }
 
-// データを読み込み、各位置の出現範囲を分析する
+// 過去count回の抽選結果を読み込み、変異体を除外したうえで頻度を集計する
 func (re *RandomEngine) LoadData(count int) error {
-	re.results = result.GetResult(count)
+	re.results = result.FilterAbnormalResults(result.GetResult(count))
 	if len(re.results) == 0 {
 		return fmt.Errorf("データを取得できませんでした")
 	}
-
-	// 各位置の出現範囲を分析
-	re.analyzePositionRanges()
-
+	re.analyzeFrequency()
 	return nil
 }
 
-// 各位置での数字の出現範囲を分析する
-func (re *RandomEngine) analyzePositionRanges() {
-	// 各位置ごとに出現した数字と出現回数を収集
-	positionNumbers := make([]map[int]bool, 7)
-	positionFrequency := make([]map[int]int, 7)
-	for i := 0; i < 7; i++ {
-		positionNumbers[i] = make(map[int]bool)
-		positionFrequency[i] = make(map[int]int)
-	}
-
-	// 過去データから各位置の数字を収集
-	for _, drawResult := range re.results {
-		if len(drawResult) < 7 {
-			continue
-		}
-
-		// 数字を整数に変換してソート
-		numbers := make([]int, 0, 7)
-		for _, numStr := range drawResult[:7] { // ボーナス番号を除く
-			num, err := strconv.Atoi(numStr)
-			if err == nil && num >= 1 && num <= 37 {
-				numbers = append(numbers, num)
+func (re *RandomEngine) analyzeFrequency() {
+	re.frequency = make(map[int]int)
+	for _, draw := range re.results {
+		for _, numStr := range draw {
+			n, err := strconv.Atoi(numStr)
+			if err == nil && n >= 1 && n <= TotalNumbers {
+				re.frequency[n]++
 			}
-		}
-
-		// ソートして位置を確定
-		sort.Ints(numbers)
-
-		// 各位置に出現した数字を記録し、出現回数をカウント
-		for pos, num := range numbers {
-			if pos < 7 {
-				positionNumbers[pos][num] = true
-				positionFrequency[pos][num]++
-			}
-		}
-	}
-
-	// 各位置の範囲を計算
-	for pos := 0; pos < 7; pos++ {
-		nums := make([]int, 0, len(positionNumbers[pos]))
-		for num := range positionNumbers[pos] {
-			nums = append(nums, num)
-		}
-
-		if len(nums) == 0 {
-			// データがない場合のデフォルト範囲
-			re.ranges[pos] = PositionRange{
-				Position:  pos + 1,
-				Min:       1,
-				Max:       37,
-				Numbers:   make([]int, 0),
-				Frequency: make(map[int]int),
-			}
-			continue
-		}
-
-		sort.Ints(nums)
-
-		re.ranges[pos] = PositionRange{
-			Position:  pos + 1,
-			Min:       nums[0],
-			Max:       nums[len(nums)-1],
-			Numbers:   nums,
-			Frequency: positionFrequency[pos],
 		}
 	}
 }
 
-// ランダムな組み合わせを生成する
+// 頻度を重み（√頻度）とした非復元ルーレット選択で7個の数字を生成する
 func (re *RandomEngine) GenerateRandomCombination() ([]int, error) {
-	if len(re.ranges) != 7 {
+	if len(re.frequency) == 0 {
 		return nil, fmt.Errorf("データが読み込まれていません")
 	}
 
-	combination := make([]int, 7)
-	usedNumbers := make(map[int]bool)
-
-	// 各位置ごとにランダムに数字を選択
-	for pos := 0; pos < 7; pos++ {
-		posRange := re.ranges[pos]
-
-		// 出現した数字のリストが空の場合、最小-最大の範囲全体を使用
-		var candidates []int
-		if len(posRange.Numbers) > 0 {
-			candidates = make([]int, len(posRange.Numbers))
-			copy(candidates, posRange.Numbers)
-		} else {
-			// 範囲内の全数字を候補にする
-			for num := posRange.Min; num <= posRange.Max; num++ {
-				candidates = append(candidates, num)
-			}
-		}
-
-		// 既に使用済みの数字を除外
-		availableCandidates := make([]int, 0)
-		for _, num := range candidates {
-			if !usedNumbers[num] {
-				availableCandidates = append(availableCandidates, num)
-			}
-		}
-
-		// 候補がない場合は範囲を広げる
-		if len(availableCandidates) == 0 {
-			// 前の位置の最大値+1から次の位置の最小値-1まで
-			minNum := 1
-			maxNum := 37
-
-			if pos > 0 {
-				minNum = combination[pos-1] + 1
-			}
-			if pos < 6 {
-				maxNum = re.ranges[pos+1].Min - 1
-				if maxNum < minNum {
-					maxNum = 37
-				}
-			}
-
-			for num := minNum; num <= maxNum; num++ {
-				if !usedNumbers[num] {
-					availableCandidates = append(availableCandidates, num)
-				}
-			}
-		}
-
-		if len(availableCandidates) == 0 {
-			return nil, fmt.Errorf("位置 %d で選択可能な数字がありません", pos+1)
-		}
-
-		// 重み付き乱択で選択
-		selectedNum := re.weightedRandomSelect(availableCandidates, posRange.Frequency)
-		combination[pos] = selectedNum
-		usedNumbers[selectedNum] = true
-	}
-
-	// ソートして返す
-	sort.Ints(combination)
-
-	return combination, nil
-}
-
-// 重み付き乱択で数字を選択する
-func (re *RandomEngine) weightedRandomSelect(candidates []int, frequency map[int]int) int {
-	if len(candidates) == 0 {
-		return 0
-	}
-
-	// 候補が1つの場合はそれを返す
-	if len(candidates) == 1 {
-		return candidates[0]
-	}
-
-	// 各候補の重みを計算
-	totalWeight := 0.0
-	weights := make([]float64, len(candidates))
-	for i, num := range candidates {
-		// 頻度の平方根を取って重みの差を緩和
-		freq := float64(frequency[num])
+	pool := make([]int, TotalNumbers)
+	weights := make([]float64, TotalNumbers)
+	for i := 0; i < TotalNumbers; i++ {
+		num := i + 1
+		pool[i] = num
+		freq := float64(re.frequency[num])
 		if freq == 0 {
 			freq = 1.0
 		}
-		weight := math.Sqrt(freq)
-
-		weights[i] = weight
-		totalWeight += weight
+		weights[i] = math.Sqrt(freq)
 	}
 
-	// 重みに基づいてランダム選択
-	randomValue := re.rng.Float64() * totalWeight
-	cumulativeWeight := 0.0
-	for i, weight := range weights {
-		cumulativeWeight += weight
-		if randomValue < cumulativeWeight {
-			return candidates[i]
+	combination := make([]int, 0, DrawCount)
+	size := TotalNumbers
+
+	for len(combination) < DrawCount {
+		total := 0.0
+		for i := 0; i < size; i++ {
+			total += weights[i]
 		}
+
+		r := re.rng.Float64() * total
+		cumulative := 0.0
+		chosen := size - 1
+		for i := 0; i < size; i++ {
+			cumulative += weights[i]
+			if r < cumulative {
+				chosen = i
+				break
+			}
+		}
+
+		combination = append(combination, pool[chosen])
+
+		// 末尾と交換して除去
+		size--
+		pool[chosen] = pool[size]
+		weights[chosen] = weights[size]
 	}
 
-	// フォールバック（通常ここには到達しない）
-	return candidates[len(candidates)-1]
+	sort.Ints(combination)
+	return combination, nil
 }
 
-// 複数のランダム組み合わせを生成する
+// 出現回数の降順で全37数字の統計を返す
+func (re *RandomEngine) GetNumberStats() []NumberStat {
+	stats := make([]NumberStat, TotalNumbers)
+	for i := 0; i < TotalNumbers; i++ {
+		stats[i] = NumberStat{
+			Number:    i + 1,
+			Frequency: re.frequency[i+1],
+		}
+	}
+	sort.Slice(stats, func(i, j int) bool {
+		if stats[i].Frequency == stats[j].Frequency {
+			return stats[i].Number < stats[j].Number
+		}
+		return stats[i].Frequency > stats[j].Frequency
+	})
+	return stats
+}
+
+// 重複のない組み合わせをcount個生成する
 func (re *RandomEngine) GenerateMultipleRandomCombinations(count int) ([][]int, error) {
 	if count <= 0 {
 		return nil, fmt.Errorf("生成数は1以上である必要があります")
@@ -240,7 +141,7 @@ func (re *RandomEngine) GenerateMultipleRandomCombinations(count int) ([][]int, 
 	combinations := make([][]int, 0, count)
 	usedCombinations := make(map[string]bool)
 
-	maxAttempts := count * 100 // 最大試行回数
+	maxAttempts := count * 100
 
 	for attempt := 0; attempt < maxAttempts && len(combinations) < count; attempt++ {
 		combination, err := re.GenerateRandomCombination()
@@ -248,7 +149,6 @@ func (re *RandomEngine) GenerateMultipleRandomCombinations(count int) ([][]int, 
 			continue
 		}
 
-		// 組み合わせの重複チェック
 		key := combinationKey(combination)
 		if !usedCombinations[key] {
 			combinations = append(combinations, combination)
@@ -263,12 +163,6 @@ func (re *RandomEngine) GenerateMultipleRandomCombinations(count int) ([][]int, 
 	return combinations, nil
 }
 
-// 各位置の出現範囲を取得する
-func (re *RandomEngine) GetPositionRanges() []PositionRange {
-	return re.ranges
-}
-
-// 組み合わせをキー文字列に変換する
 func combinationKey(combination []int) string {
 	var builder strings.Builder
 	for i, num := range combination {

@@ -33,8 +33,12 @@ type StatisticalAnalysis struct {
 	RareNumbers       []int       // 出現回数が少ない数字
 	HotNumbers        []int       // 直近10回以内で連続して出ている数字
 	RevivalCandidates []int       // 20回以上出ていない復活候補
-	FrequencyMap      map[int]int // 各数字の出現回数
-	LastAppearance    map[int]int // 各数字の最後の出現回数
+	FrequencyMap      map[int]int // 各数字の出現回数（全ポジション合算）
+	LastAppearance    map[int]int // 各数字の最後の出現回数（全ポジション合算）
+
+	// ポジション別統計（index 0 = 昇順1番目、index 6 = 昇順7番目）
+	PositionFrequencyMap   []map[int]int // PositionFrequencyMap[pos][num] = 出現回数
+	PositionLastAppearance []map[int]int // PositionLastAppearance[pos][num] = 最終出現インデックス（0=直近）
 }
 
 // CombinationHistory は組み合わせ履歴を保持します
